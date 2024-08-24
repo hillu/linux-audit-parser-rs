@@ -1,6 +1,7 @@
 use std::fmt::{self, Debug, Display};
 use std::str;
 
+#[cfg(feature = "serde")]
 use serde::{Serialize, Serializer};
 
 /// Common values found in SYSCALL records
@@ -144,6 +145,7 @@ impl Display for Key {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for Key {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {

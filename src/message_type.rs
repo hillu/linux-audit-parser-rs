@@ -1,5 +1,6 @@
 use std::fmt::{self, Debug, Display};
 
+#[cfg(feature = "serde")]
 use serde::{Serialize, Serializer};
 
 use crate::constants::*;
@@ -36,6 +37,7 @@ impl Debug for MessageType {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for MessageType {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {

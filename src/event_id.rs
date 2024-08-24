@@ -1,4 +1,6 @@
+#[cfg(feature = "serde")]
 use serde::{Serialize, Serializer};
+
 use std::fmt::{self, Display};
 
 /// The identifier of an audit event, corresponding to the
@@ -21,6 +23,7 @@ impl Display for EventID {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for EventID {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {

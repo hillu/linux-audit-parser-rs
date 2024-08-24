@@ -1,6 +1,7 @@
 use std::fmt::{self, Debug};
 use std::ops::Range;
 
+#[cfg(feature = "serde")]
 use serde::{ser::SerializeMap, Serialize, Serializer};
 
 use crate::*;
@@ -32,6 +33,7 @@ impl Debug for Body {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for Body {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {

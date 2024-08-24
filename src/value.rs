@@ -4,8 +4,8 @@ use std::iter::Iterator;
 use std::str;
 use std::string::*;
 
-use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
+#[cfg(feature = "serde")]
+use serde::{ser::SerializeMap, Serialize, Serializer};
 
 use crate::*;
 
@@ -42,6 +42,7 @@ impl Display for Number {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for Number {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
@@ -234,6 +235,7 @@ impl Debug for Value<'_> {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for Value<'_> {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
@@ -348,8 +350,10 @@ impl From<i64> for Value<'_> {
 }
 
 /// Helper type to enforce that serialize_bytes() is used in serialization.
+#[cfg(feature = "serde")]
 pub(crate) struct Bytes<'a>(pub &'a [u8]);
 
+#[cfg(feature = "serde")]
 impl<'a> Serialize for Bytes<'a> {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         s.serialize_bytes(self.0)
