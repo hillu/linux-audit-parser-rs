@@ -1,9 +1,6 @@
 use std::convert::{From, TryFrom};
 use std::str;
 
-use crate::constants::*;
-use crate::types::*;
-
 use nom::{
     branch::*, bytes::complete::*, character::complete::*, character::*, combinator::*, multi::*,
     sequence::*, IResult,
@@ -12,6 +9,9 @@ use nom::{
 use nom::character::complete::{i64 as dec_i64, u16 as dec_u16, u32 as dec_u32, u64 as dec_u64};
 
 use thiserror::Error;
+
+use crate::constants::*;
+use crate::*;
 
 #[derive(Debug, Error)]
 pub enum ParseError {

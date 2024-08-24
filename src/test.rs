@@ -1,5 +1,4 @@
-use crate::parser::*;
-use crate::types::*;
+use crate::*;
 
 #[test]
 fn parser() {
