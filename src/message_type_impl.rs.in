@@ -1,0 +1,3 @@
+impl MessageType {
+    /* @MSG_TYPE_CONST@ */
+}
