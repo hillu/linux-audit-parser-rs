@@ -9,10 +9,9 @@ authors = ["Hilko Bengen <bengen@hilluzination.de>"]
 keywords = ["linux", "audit", "auditd", "parser"]
 
 [dependencies]
-indexmap = { version = "2.4.0", features = ["serde"] }
+indexmap = { version = "2.4.0" }
 lazy_static = "1.5.0"
 nom = "7.1.3"
-serde = { version = "1.0.209", features = ["serde_derive"] }
-serde_json = { version = "1.0.127", features = ["indexmap"] }
+serde = { version = "1.0.209" }
 thiserror = "1.0.63"
 tinyvec = { version = "1.8.0", features = ["alloc"] }
