@@ -151,6 +151,11 @@ impl Body<'_> {
         let key = key.as_ref();
         self.elems.iter().find(|(k, _)| k == key).map(|(_, v)| v)
     }
+
+    /// Reserves capacity for at least `additional` more elements.
+    pub fn reserve(&mut self, additional: usize) {
+        self.elems.reserve(additional);
+    }
 }
 
 impl<'a> Body<'a> {
