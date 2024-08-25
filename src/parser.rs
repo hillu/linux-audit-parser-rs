@@ -36,7 +36,7 @@ pub enum ParseError {
 /// syscall, arch, sockaddr fields, those resolved values are dropped
 /// by the parser.
 #[allow(clippy::type_complexity)]
-pub fn parse(raw: &[u8], skip_enriched: bool) -> Result<Message, ParseError> {
+pub fn parse<'a>(raw: &[u8], skip_enriched: bool) -> Result<Message<'a>, ParseError> {
     let (rest, (node, ty, id)) =
         parse_header(raw).map_err(|_| ParseError::MalformedHeader(raw.to_vec()))?;
 

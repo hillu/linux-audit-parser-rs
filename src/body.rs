@@ -7,13 +7,13 @@ use serde::{ser::SerializeMap, Serialize, Serializer};
 use crate::*;
 
 /// List of [`Key`]/[`Value`] pairs
-pub struct Body {
-    elems: Vec<(Key, Value<'static>)>,
+pub struct Body<'a> {
+    elems: Vec<(Key, Value<'a>)>,
     arena: Vec<Vec<u8>>,
     _pin: std::marker::PhantomPinned,
 }
 
-impl Default for Body {
+impl Default for Body<'_> {
     fn default() -> Self {
         Body {
             elems: Vec::with_capacity(8),
@@ -23,7 +23,7 @@ impl Default for Body {
     }
 }
 
-impl Debug for Body {
+impl Debug for Body<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut seq = f.debug_struct("Body");
         for (k, v) in self {
@@ -34,7 +34,7 @@ impl Debug for Body {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for Body {
+impl Serialize for Body<'_> {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         let mut map = s.serialize_map(None)?;
@@ -48,7 +48,7 @@ impl Serialize for Body {
     }
 }
 
-impl Body {
+impl Body<'_> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -146,14 +146,6 @@ impl Body {
         self.elems.is_empty()
     }
 
-    /// Retains only the elements specified by the predicate.
-    pub fn retain<F>(&mut self, f: F)
-    where
-        F: FnMut(&(Key, Value<'_>)) -> bool,
-    {
-        self.elems.retain(f)
-    }
-
     /// Retrieves the first value found for a given key
     pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<&Value> {
         let key = key.as_ref();
@@ -161,7 +153,17 @@ impl Body {
     }
 }
 
-impl Clone for Body {
+impl<'a> Body<'a> {
+    /// Retains only the elements specified by the predicate.
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&(Key, Value<'a>)) -> bool,
+    {
+        self.elems.retain(f)
+    }
+}
+
+impl Clone for Body<'_> {
     fn clone(&self) -> Self {
         let mut new = Body::default();
         self.into_iter()
@@ -171,7 +173,7 @@ impl Clone for Body {
     }
 }
 
-impl<'a> IntoIterator for &'a Body {
+impl<'a> IntoIterator for &'a Body<'a> {
     type Item = &'a (Key, Value<'a>);
     type IntoIter = std::slice::Iter<'a, (Key, Value<'a>)>;
     fn into_iter(self) -> Self::IntoIter {
