@@ -4,13 +4,14 @@ use serde::{Serialize, Serializer};
 use std::fmt::{self, Display};
 
 /// The identifier of an audit event, corresponding to the
-/// `msg=audit(…)` part of every _auditd(8)_ log line.
+/// `msg=audit(…)` part of every Linux Audit log line.
 ///
-/// It consists of a mullisecond-precision timestamp and a sequence
-/// number, thus guaranteeing per-host uniqueness.
+/// The event ID can reasonably be expected to be unique per system.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Default)]
 pub struct EventID {
+    /// Unix epoch-based timestamp, with mullisecond-precision
     pub timestamp: u64,
+    /// Sequence number
     pub sequence: u32,
 }
 

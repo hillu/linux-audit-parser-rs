@@ -4,7 +4,7 @@ use std::str;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Serializer};
 
-/// Common values found in SYSCALL records
+/// Common [`Key`]s found in SYSCALL records
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
 #[repr(usize)]
 pub enum Common {
@@ -89,6 +89,8 @@ impl Display for Common {
 pub(crate) type NVec = tinyvec::TinyVec<[u8; 14]>;
 
 /// Representation of the key part of key/value pairs in [`Body`]
+///
+/// [`Body`]: crate::Body
 #[derive(PartialEq, Eq, Clone)]
 pub enum Key {
     /// regular ASCII-only name as returned by parser

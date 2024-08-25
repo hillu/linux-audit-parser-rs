@@ -13,14 +13,19 @@ use thiserror::Error;
 use crate::constants::*;
 use crate::*;
 
+/// Audit parser error type
 #[derive(Debug, Error)]
 pub enum ParseError {
+    /// The header (`type= … msg=audit(…):`) could not be parsed.
     #[error("cannot parse header: {}", String::from_utf8_lossy(.0))]
     MalformedHeader(Vec<u8>),
+    /// The body (everything after the event ID) could not be parsed.
     #[error("cannot parse body: {}", String::from_utf8_lossy(.0))]
     MalformedBody(Vec<u8>),
+    /// Garbage text was found at the end of the body.
     #[error("garbage at end of message: {}", String::from_utf8_lossy(.0))]
     TrailingGarbage(Vec<u8>),
+    /// A value in hexadecimal encoding could not be converted.
     #[error("{id} ({ty}) can't hex-decode {}", String::from_utf8_lossy(.hex_str))]
     HexDecodeError {
         ty: MessageType,
@@ -32,9 +37,9 @@ pub enum ParseError {
 /// Parse a single log line as produced by _auditd(8)_
 ///
 /// If `skip_enriched` is set and _auditd_ has been configured to
-/// produce `log_format=ENRICHED` logs, i.e. to resolve uid, gid,
-/// syscall, arch, sockaddr fields, those resolved values are dropped
-/// by the parser.
+/// produce `log_format=ENRICHED` logs, i.e. to resolve `uid`, `gid`,
+/// `syscall`, `arch`, `sockaddr` fields, those resolved values are
+/// dropped by the parser.
 #[allow(clippy::type_complexity)]
 pub fn parse<'a>(raw: &[u8], skip_enriched: bool) -> Result<Message<'a>, ParseError> {
     let (rest, (node, ty, id)) =

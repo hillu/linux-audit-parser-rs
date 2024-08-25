@@ -5,15 +5,13 @@ use serde::{Serialize, Serializer};
 
 use crate::constants::*;
 
-/// The type of an audit message, corresponding to the `type=…` part
-/// of every _auditd(8)_ log line.
+/// Type of an audit message, corresponding to the `type=…` part of
+/// every Linux Audit log line.
 ///
-/// The implementation uses the same 32bit unsigned integer that is
-/// used by the Linux Audit API.
-///
-/// The mappings between numeric and symbolic values is generated
-/// using CSV retrieved from the [`Linux Audit Project`]'s
-/// documentation.
+/// The implementation uses the same 32bit unsigned integer values
+/// that are used by the Linux Audit API. Mappings between numeric and
+/// symbolic values is generated using CSV retrieved from the [`Linux
+/// Audit Project`]'s documentation.
 ///
 /// [`Linux Audit Project`]: https://github.com/linux-audit/audit-documentation
 #[derive(PartialEq, Eq, Hash, Default, Clone, Copy)]

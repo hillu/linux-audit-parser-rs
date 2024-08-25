@@ -6,7 +6,7 @@ use serde::{ser::SerializeMap, Serialize, Serializer};
 
 use crate::*;
 
-/// List of [`Key`]/[`Value`] pairs
+/// Parsed body of an Audit message, consisting of [`Key`]/[`Value`] pairs.
 pub struct Body<'a> {
     elems: Vec<(Key, Value<'a>)>,
     arena: Vec<Vec<u8>>,
@@ -49,10 +49,13 @@ impl Serialize for Body<'_> {
 }
 
 impl Body<'_> {
+    /// Constructs a new, empty `Body`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Constructs a new, empty `Body` with at least the specified
+    /// `capacity` for `Key`/`Value` entries.
     pub fn with_capacity(len: usize) -> Self {
         Self {
             elems: Vec::with_capacity(len),
@@ -120,19 +123,19 @@ impl Body<'_> {
         }
     }
 
-    /// Appends an key/value pair to the back of a Body.
+    /// Appends `kv` to the back of a Body.
     pub fn push(&mut self, kv: (Key, Value)) {
         let (k, v) = kv;
         let v = self.add_value(v);
         self.elems.push((k, v));
     }
 
-    /// Returns the number of elements in the Body.
+    /// Returns the number of elements in the `Body`.
     pub fn len(&self) -> usize {
         self.elems.len()
     }
 
-    /// Extends Body with the elements of another Body.
+    /// Extends Body with the elements of another `Body`.
     pub fn extend(&mut self, other: Self) {
         self.arena.extend(other.arena);
         self.elems.reserve(other.elems.len());
@@ -141,12 +144,12 @@ impl Body<'_> {
         }
     }
 
-    /// Returns `true` if the Body has a length of 0.
+    /// Returns `true` if the `Body` has a length of 0.
     pub fn is_empty(&self) -> bool {
         self.elems.is_empty()
     }
 
-    /// Retrieves the first value found for a given key
+    /// Retrieves the first value found for a given `key`.
     pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<&Value> {
         let key = key.as_ref();
         self.elems.iter().find(|(k, _)| k == key).map(|(_, v)| v)
