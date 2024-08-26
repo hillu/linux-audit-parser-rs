@@ -56,26 +56,26 @@ impl Serialize for Number {
 /// Representation of the value part of key/value pairs in [`Body`]
 #[derive(Clone)]
 pub enum Value<'a> {
+    /// Empty value.
     Empty,
+    /// A byte string.
     Str(&'a [u8], Quote),
-    /// Segments are generated in Coalesce::normalize() from `EXECVE`
-    /// / `aX[Y]` fragments.
-    Segments(Vec<&'a [u8]>),
-    /// Lists are generated in Coalesce::normalize() e.g.: `EXECVE` /
-    /// `a0`, `a1`, `a2` … -> `ARGV`
-    List(Vec<Value<'a>>),
-    StringifiedList(Vec<Value<'a>>),
-    /// Key/Value map, used in ENV (environment variables) list
-    Map(Vec<(Key, Value<'a>)>),
-    /// Values generated in parse() from unquoted Str values
-    ///
-    /// For example, `SYSCALL` / `a0` etc are interpreted as
-    /// hexadecimal numbers.
+    /// Parsed number.
     Number(Number),
-    /// Elements removed from ARGV lists
-    Skipped((usize, usize)),
-    Literal(&'static str),
+    /// A list of byte strings.
+    List(Vec<Value<'a>>),
+    /// A byte string that is not stored within the [`Body`]. Used for
+    /// decoded hex-strings.
     Owned(Vec<u8>),
+    /// An internal key/value map. Not currently produced by the parser.
+    Map(Vec<(Key, Value<'a>)>),
+    /// Non-contiguous byte string. Not produced by the parser.
+    Segments(Vec<&'a [u8]>),
+    StringifiedList(Vec<Value<'a>>),
+    /// Elements removed from ARGV lists. Not produced by the parser.
+    Skipped((usize, usize)),
+    /// A literal string. Not produced by the parser.
+    Literal(&'static str),
 }
 
 impl Default for Value<'_> {
