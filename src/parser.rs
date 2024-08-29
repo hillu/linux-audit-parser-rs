@@ -13,6 +13,19 @@ use thiserror::Error;
 use crate::constants::*;
 use crate::*;
 
+/// Parser for Linux Audit messages, with a few configurable options
+#[derive(Debug)]
+pub struct Parser {
+    /// Process enriched (i.e. ALL-CAPS keys)
+    pub enriched: bool,
+}
+
+impl Default for Parser {
+    fn default() -> Self {
+        Self { enriched: true }
+    }
+}
+
 /// Audit parser error type
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -40,26 +53,109 @@ pub enum ParseError {
 /// produce `log_format=ENRICHED` logs, i.e. to resolve `uid`, `gid`,
 /// `syscall`, `arch`, `sockaddr` fields, those resolved values are
 /// dropped by the parser.
-#[allow(clippy::type_complexity)]
 pub fn parse<'a>(raw: &[u8], skip_enriched: bool) -> Result<Message<'a>, ParseError> {
-    let (rest, (node, ty, id)) =
-        parse_header(raw).map_err(|_| ParseError::MalformedHeader(raw.to_vec()))?;
+    Parser {
+        enriched: !skip_enriched,
+        ..Parser::default()
+    }
+    .parse(raw)
+}
 
-    let (rest, kv) = parse_body(rest, ty, skip_enriched)
-        .map_err(|_| ParseError::MalformedBody(rest.to_vec()))?;
+impl Parser {
+    /// Parse a single log line as produced by _auditd(8)_
+    pub fn parse<'a, 'b>(&'a self, raw: &'a [u8]) -> Result<Message<'b>, ParseError> {
+        let (rest, (node, ty, id)) =
+            parse_header(raw).map_err(|_| ParseError::MalformedHeader(raw.to_vec()))?;
 
-    if !rest.is_empty() {
-        return Err(ParseError::TrailingGarbage(rest.to_vec()));
+        let (rest, kv) = self
+            .parse_body(rest, ty)
+            .map_err(|_| ParseError::MalformedBody(rest.to_vec()))?;
+
+        if !rest.is_empty() {
+            return Err(ParseError::TrailingGarbage(rest.to_vec()));
+        }
+
+        let node = node.map(|s| s.to_vec());
+
+        let mut body = Body::new();
+        for (k, v) in kv {
+            body.push((k, v));
+        }
+
+        Ok(Message { id, node, ty, body })
     }
 
-    let node = node.map(|s| s.to_vec());
+    /// Recognize the body: Multiple key/value pairs, with special cases
+    /// for some irregular messages
+    #[inline(always)]
+    fn parse_body<'a>(
+        &'a self,
+        input: &'a [u8],
+        ty: MessageType,
+    ) -> IResult<&'a [u8], Vec<(Key, Value)>> {
+        // Handle some corner cases that don't fit the general key=value
+        // scheme.
+        let (input, special) = match ty {
+            MessageType::AVC => opt(map(
+                tuple((
+                    preceded(
+                        pair(tag("avc:"), space0),
+                        alt((tag("granted"), tag("denied"))),
+                    ),
+                    delimited(
+                        tuple((space0, tag("{"), space0)),
+                        many1(terminated(parse_identifier, space0)),
+                        tuple((tag("}"), space0, tag("for"), space0)),
+                    ),
+                )),
+                |(k, v)| {
+                    (
+                        Key::Name(NVec::from(k)),
+                        Value::List(
+                            v.iter()
+                                .map(|e| Value::Str(e, Quote::None))
+                                .collect::<Vec<_>>(),
+                        ),
+                    )
+                },
+            ))(input)?,
+            MessageType::TTY => {
+                let (input, _) = opt(tag("tty "))(input)?;
+                (input, None)
+            }
+            MessageType::MAC_POLICY_LOAD => {
+                let (input, _) = opt(tag("policy loaded "))(input)?;
+                (input, None)
+            }
+            _ => opt(map(
+                terminated(tag("netlabel"), pair(tag(":"), space0)),
+                |s| (Key::Name(NVec::from(s)), Value::Empty),
+            ))(input)?,
+        };
 
-    let mut body = Body::new();
-    for (k, v) in kv {
-        body.push((k, v));
+        let (input, mut kv) = if !self.enriched {
+            terminated(
+                separated_list0(tag(b" "), |input| parse_kv(input, ty)),
+                alt((
+                    value((), tuple((tag("\x1d"), is_not("\n"), tag("\n")))),
+                    value((), tag("\n")),
+                )),
+            )(input)?
+        } else {
+            terminated(
+                separated_list0(take_while1(|c| c == b' ' || c == b'\x1d'), |input| {
+                    parse_kv(input, ty)
+                }),
+                newline,
+            )(input)?
+        };
+
+        if let Some(s) = special {
+            kv.push(s)
+        }
+
+        Ok((input, kv))
     }
-
-    Ok(Message { id, node, ty, body })
 }
 
 /// Recognize the header: node, type, event identifier
@@ -113,78 +209,6 @@ fn parse_msgid(input: &[u8]) -> IResult<&[u8], EventID> {
             sequence,
         },
     )(input)
-}
-
-/// Recognize the body: Multiple key/value pairs, with special cases
-/// for some irregular messages
-#[inline(always)]
-fn parse_body(
-    input: &[u8],
-    ty: MessageType,
-    skip_enriched: bool,
-) -> IResult<&[u8], Vec<(Key, Value)>> {
-    // Handle some corner cases that don't fit the general key=value
-    // scheme.
-    let (input, special) = match ty {
-        MessageType::AVC => opt(map(
-            tuple((
-                preceded(
-                    pair(tag("avc:"), space0),
-                    alt((tag("granted"), tag("denied"))),
-                ),
-                delimited(
-                    tuple((space0, tag("{"), space0)),
-                    many1(terminated(parse_identifier, space0)),
-                    tuple((tag("}"), space0, tag("for"), space0)),
-                ),
-            )),
-            |(k, v)| {
-                (
-                    Key::Name(NVec::from(k)),
-                    Value::List(
-                        v.iter()
-                            .map(|e| Value::Str(e, Quote::None))
-                            .collect::<Vec<_>>(),
-                    ),
-                )
-            },
-        ))(input)?,
-        MessageType::TTY => {
-            let (input, _) = opt(tag("tty "))(input)?;
-            (input, None)
-        }
-        MessageType::MAC_POLICY_LOAD => {
-            let (input, _) = opt(tag("policy loaded "))(input)?;
-            (input, None)
-        }
-        _ => opt(map(
-            terminated(tag("netlabel"), pair(tag(":"), space0)),
-            |s| (Key::Name(NVec::from(s)), Value::Empty),
-        ))(input)?,
-    };
-
-    let (input, mut kv) = if skip_enriched {
-        terminated(
-            separated_list0(tag(b" "), |input| parse_kv(input, ty)),
-            alt((
-                value((), tuple((tag("\x1d"), is_not("\n"), tag("\n")))),
-                value((), tag("\n")),
-            )),
-        )(input)?
-    } else {
-        terminated(
-            separated_list0(take_while1(|c| c == b' ' || c == b'\x1d'), |input| {
-                parse_kv(input, ty)
-            }),
-            newline,
-        )(input)?
-    };
-
-    if let Some(s) = special {
-        kv.push(s)
-    }
-
-    Ok((input, kv))
 }
 
 /// Recognize one key/value pair
