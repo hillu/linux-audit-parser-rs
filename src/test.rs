@@ -160,15 +160,41 @@ fn parser() {
             sequence: 15220
         }
     );
-    assert_eq!(msg.body.into_iter().map(|(k,v)| format!("{k:?}: {v:?}")).collect::<Vec<_>>(),
-                   vec!("pid: Num:<9460>",
-                        "uid: Num:<1000>",
-                        "auid: Num:<1000>",
-                        "ses: Num:<1>",
-                        "msg: Str:<op=PAM:accounting grantors=pam_permit acct=\"user\" exe=\"/usr/bin/sudo\" hostname=? addr=? terminal=/dev/pts/1 res=success>",
-                        "UID: Str:<user>",
-                        "AUID: Str:<user>",
-                   ));
+    assert_eq!(
+        msg.body
+            .into_iter()
+            .map(|(k, v)| format!("{k:?}: {v:?}"))
+            .collect::<Vec<_>>(),
+        vec!(
+            "pid: Num:<9460>",
+            "uid: Num:<1000>",
+            "auid: Num:<1000>",
+            "ses: Num:<1>",
+	    "msg: Map:<op=Str:<PAM:accounting> grantors=Str:<pam_permit> acct=Str:<user> exe=Str:</usr/bin/sudo> hostname=Empty addr=Empty terminal=Str:</dev/pts/1> res=Str:<success>>",
+            "UID: Str:<user>",
+            "AUID: Str:<user>",
+        )
+    );
+
+    let msg = Parser {
+        enriched: false,
+        split_msg: false,
+    }
+    .parse(include_bytes!("testdata/line-user-acct.txt"))
+    .unwrap();
+    assert_eq!(
+        msg.body
+            .into_iter()
+            .map(|(k, v)| format!("{k:?}: {v:?}"))
+            .collect::<Vec<_>>(),
+        vec!(
+            "pid: Num:<9460>",
+            "uid: Num:<1000>",
+            "auid: Num:<1000>",
+            "ses: Num:<1>",
+            r#"msg: Str:<op=PAM:accounting grantors=pam_permit acct="user" exe="/usr/bin/sudo" hostname=? addr=? terminal=/dev/pts/1 res=success>"#,
+        )
+    );
 
     let msg = parse(include_bytes!("testdata/line-unknown.txt"), false).unwrap();
     assert_eq!(msg.ty, MessageType::BPF);
@@ -333,6 +359,58 @@ fn parser() {
     parse(include_bytes!("testdata/line-user-auth-2.txt"), false).unwrap();
     parse(include_bytes!("testdata/line-mac-policy-load.txt"), false).unwrap();
     parse(include_bytes!("testdata/line-tty.txt"), false).unwrap();
+}
+
+#[test]
+fn test_msg_kv() {
+    let p = Parser {
+        split_msg: true,
+        ..Parser::default()
+    };
+    for line in [
+        &include_bytes!("testdata/line-acct-lock.txt")[..],
+        &include_bytes!("testdata/line-add-group.txt")[..],
+        &include_bytes!("testdata/line-add-user.txt")[..],
+        &include_bytes!("testdata/line-chgrp-id.txt")[..],
+        &include_bytes!("testdata/line-cred-acq.txt")[..],
+        &include_bytes!("testdata/line-cred-disp.txt")[..],
+        &include_bytes!("testdata/line-cred-refr.txt")[..],
+        &include_bytes!("testdata/line-crypto-key-user.txt")[..],
+        &include_bytes!("testdata/line-crypto-session.txt")[..],
+        &include_bytes!("testdata/line-crypto-param-change-user.txt")[..],
+        &include_bytes!("testdata/line-daemon-end-2.txt")[..],
+        &include_bytes!("testdata/line-del-group.txt")[..],
+        &include_bytes!("testdata/line-del-user.txt")[..],
+        &include_bytes!("testdata/line-grp-mgmt.txt")[..],
+        &include_bytes!("testdata/line-software-update.txt")[..],
+        &include_bytes!("testdata/line-user-acct.txt")[..],
+        &include_bytes!("testdata/line-user-auth.txt")[..],
+        &include_bytes!("testdata/line-user-auth-2.txt")[..],
+        &include_bytes!("testdata/line-user-chauthtok.txt")[..],
+        &include_bytes!("testdata/line-user-end.txt")[..],
+        &include_bytes!("testdata/line-user-err.txt")[..],
+        &include_bytes!("testdata/line-user-login.txt")[..],
+        &include_bytes!("testdata/line-user-logout.txt")[..],
+        &include_bytes!("testdata/line-user-mgmt.txt")[..],
+        &include_bytes!("testdata/line-user-role-change.txt")[..],
+        &include_bytes!("testdata/line-user-start.txt")[..],
+        &include_bytes!("testdata/line-usys-config.txt")[..],
+        &include_bytes!("testdata/line-user-avc-1.txt")[..],
+        &include_bytes!("testdata/line-user-avc-2.txt")[..],
+        &include_bytes!("testdata/line-user-selinux-err.txt")[..],
+    ] {
+        let m = p.parse(line).unwrap();
+        println!("{:?}", &m);
+        let msg = m
+            .body
+            .get("msg")
+            .expect(&format!("{}: Field msg not found", m.id));
+        match msg {
+            Value::Map(_) => {}
+            Value::Str(_, _) => panic!("{}: Field msg was parsed as string", m.id),
+            _ => panic!("{}: Field msg was parsed as something else", m.id),
+        }
+    }
 }
 
 #[test]

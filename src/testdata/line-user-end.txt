@@ -1,0 +1,1 @@
+type=USER_END msg=audit(1725004605.819:105664): pid=14548 uid=0 auid=4294967295 ses=4294967295 msg='op=PAM:session_close grantors=pam_keyinit,pam_keyinit,pam_limits,pam_systemd,pam_unix acct="root" exe="/usr/bin/sudo" hostname=? addr=? terminal=/dev/pts/0 res=success'

@@ -1,0 +1,1 @@
+type=DAEMON_END msg=audit(1724970459.096:8216): op=terminate auid=0 pid=12333 subj=24970459.090:670): pid=12323 uid=0 auid=4294967295 ses=4294967295 msg='op=PAM:session_open grantors=pam_keyinit,pam_keyinit,pam_limits,pam_systemd,pam_unix acct="root" exe="/usr/bin/sudo" hostname=? addr=? terminal=/dev/pts/0 res=success' res=success

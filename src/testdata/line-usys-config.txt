@@ -1,0 +1,1 @@
+type=USYS_CONFIG msg=audit(1724337072.493:467): pid=1876 uid=0 auid=4294967295 ses=4294967295 msg='op=change-system-time exe="/usr/sbin/hwclock" hostname=? addr=? terminal=? res=failed'UID="root" AUID="unset"

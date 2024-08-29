@@ -1,0 +1,1 @@
+type=CRYPTO_SESSION msg=audit(1724778544.061:594047): pid=21702 uid=0 auid=4294967295 ses=4294967295 msg='op=start direction=from-client cipher=chacha20-poly1305@openssh.com ksize=512 mac=<implicit> pfs=ecdh-sha2-nistp521 spid=21704 suid=74 rport=46984 laddr=10.10.10.10 lport=22  exe="/usr/sbin/sshd" hostname=? addr=10.11.11.11 terminal=? res=success'

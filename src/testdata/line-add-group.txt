@@ -1,0 +1,1 @@
+type=ADD_GROUP msg=audit(1724970920.775:6704): pid=15618 uid=0 auid=4294967295 ses=4294967295 msg='op=add-group acct="gitlab-runner" exe="/usr/sbin/useradd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"

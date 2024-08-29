@@ -1,0 +1,1 @@
+type=CHGRP_ID msg=audit(1723948962.207:28220): pid=11159 uid=0 auid=4294967295 ses=4294967295 msg='op=changing new_gid=4550 id=0 exe="/usr/bin/newgrp" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset" NEW_GID="somegroup" ID="root"

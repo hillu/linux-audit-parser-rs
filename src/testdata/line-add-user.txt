@@ -1,0 +1,1 @@
+type=ADD_USER msg=audit(1724970920.775:6705): pid=15618 uid=0 auid=4294967295 ses=4294967295 msg='op=add-user id=1501 exe="/usr/sbin/useradd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset" ID="unknown(1501)"

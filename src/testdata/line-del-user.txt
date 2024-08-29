@@ -1,0 +1,1 @@
+type=DEL_USER msg=audit(1724970804.251:2682): pid=13860 uid=0 auid=4294967295 ses=4294967295 msg='op=delete-user id=65534 exe="/usr/sbin/userdel" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset" ID="nfsnobody"

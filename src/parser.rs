@@ -16,13 +16,18 @@ use crate::*;
 /// Parser for Linux Audit messages, with a few configurable options
 #[derive(Debug)]
 pub struct Parser {
-    /// Process enriched (i.e. ALL-CAPS keys)
+    /// Process enriched (i.e. ALL-CAPS keys). Default: true
     pub enriched: bool,
+    /// Try to process common msg='…' strings into key/value maps. Default: true
+    pub split_msg: bool,
 }
 
 impl Default for Parser {
     fn default() -> Self {
-        Self { enriched: true }
+        Self {
+            enriched: true,
+            split_msg: true,
+        }
     }
 }
 
@@ -53,6 +58,9 @@ pub enum ParseError {
 /// produce `log_format=ENRICHED` logs, i.e. to resolve `uid`, `gid`,
 /// `syscall`, `arch`, `sockaddr` fields, those resolved values are
 /// dropped by the parser.
+///
+/// To maintain compatibility, `parse` does not attempt to process
+/// single-quoted `msg='…'` strings into key/value maps.
 pub fn parse<'a>(raw: &[u8], skip_enriched: bool) -> Result<Message<'a>, ParseError> {
     Parser {
         enriched: !skip_enriched,
@@ -135,7 +143,7 @@ impl Parser {
 
         let (input, mut kv) = if !self.enriched {
             terminated(
-                separated_list0(tag(b" "), |input| parse_kv(input, ty)),
+                separated_list0(tag(b" "), |input| self.parse_kv(input, ty)),
                 alt((
                     value((), tuple((tag("\x1d"), is_not("\n"), tag("\n")))),
                     value((), tag("\n")),
@@ -144,7 +152,7 @@ impl Parser {
         } else {
             terminated(
                 separated_list0(take_while1(|c| c == b' ' || c == b'\x1d'), |input| {
-                    parse_kv(input, ty)
+                    self.parse_kv(input, ty)
                 }),
                 newline,
             )(input)?
@@ -155,6 +163,101 @@ impl Parser {
         }
 
         Ok((input, kv))
+    }
+
+    /// Recognize one key/value pair
+    #[inline(always)]
+    fn parse_kv<'a>(&'a self, input: &'a [u8], ty: MessageType) -> IResult<&'a [u8], (Key, Value)> {
+        let (input, key) = match ty {
+            // Special case for execve arguments: aX, aX[Y], aX_len
+            MessageType::EXECVE
+                if !input.is_empty() && input[0] == b'a' && !input.starts_with(b"argc") =>
+            {
+                terminated(
+                    alt((parse_key_a_x_len, parse_key_a_xy, parse_key_a_x)),
+                    tag("="),
+                )(input)
+            }
+            // Special case for syscall params: aX
+            MessageType::SYSCALL => terminated(alt((parse_key_a_x, parse_key)), tag("="))(input),
+            _ => terminated(parse_key, tag("="))(input),
+        }?;
+
+        let (input, value) = match (ty, &key) {
+            (MessageType::SYSCALL, Key::Arg(_, None)) => map(
+                recognize(terminated(
+                    many1_count(take_while1(is_hex_digit)),
+                    peek(take_while1(is_sep)),
+                )),
+                |s| {
+                    let ps = unsafe { str::from_utf8_unchecked(s) };
+                    match u64::from_str_radix(ps, 16) {
+                        Ok(n) => Value::Number(Number::Hex(n)),
+                        Err(_) => Value::Str(s, Quote::None),
+                    }
+                },
+            )(input)?,
+            (MessageType::SYSCALL, Key::Common(c)) => self.parse_common(input, ty, *c)?,
+            (MessageType::EXECVE, Key::Arg(_, _)) => parse_encoded(input)?,
+            (MessageType::EXECVE, Key::ArgLen(_)) => parse_dec(input)?,
+            (_, Key::Name(name)) => parse_named(input, ty, name)?,
+            (_, Key::Common(c)) => self.parse_common(input, ty, *c)?,
+            (_, Key::NameUID(name)) | (_, Key::NameGID(name)) => {
+                alt((parse_dec, |input| parse_unspec_value(input, ty, name)))(input)?
+            }
+            _ => parse_encoded(input)?,
+        };
+
+        Ok((input, (key, value)))
+    }
+
+    #[inline(always)]
+    fn parse_common<'a>(
+        &'a self,
+        input: &'a [u8],
+        ty: MessageType,
+        c: Common,
+    ) -> IResult<&'a [u8], Value> {
+        let name = <&str>::from(c).as_bytes();
+        match c {
+            Common::Arch | Common::CapFi | Common::CapFp | Common::CapFver => {
+                alt((parse_hex, |input| parse_unspec_value(input, ty, name)))(input)
+            }
+            Common::Argc
+            | Common::Exit
+            | Common::CapFe
+            | Common::Inode
+            | Common::Item
+            | Common::Items
+            | Common::Pid
+            | Common::PPid
+            | Common::Ses
+            | Common::Syscall => {
+                alt((parse_dec, |input| parse_unspec_value(input, ty, name)))(input)
+            }
+            Common::Success
+            | Common::Cwd
+            | Common::Dev
+            | Common::Tty
+            | Common::Comm
+            | Common::Exe
+            | Common::Name
+            | Common::Nametype
+            | Common::Subj
+            | Common::Key => {
+                alt((parse_encoded, |input| parse_unspec_value(input, ty, name)))(input)
+            }
+            Common::Mode => alt((parse_oct, |input| parse_unspec_value(input, ty, name)))(input),
+            Common::Msg => {
+                if self.split_msg {
+                    alt((parse_kv_sq_as_map, |input| {
+                        parse_unspec_value(input, ty, name)
+                    }))(input)
+                } else {
+                    alt((parse_encoded, |input| parse_unspec_value(input, ty, name)))(input)
+                }
+            }
+        }
     }
 }
 
@@ -211,52 +314,6 @@ fn parse_msgid(input: &[u8]) -> IResult<&[u8], EventID> {
     )(input)
 }
 
-/// Recognize one key/value pair
-#[inline(always)]
-fn parse_kv(input: &[u8], ty: MessageType) -> IResult<&[u8], (Key, Value)> {
-    let (input, key) = match ty {
-        // Special case for execve arguments: aX, aX[Y], aX_len
-        MessageType::EXECVE
-            if !input.is_empty() && input[0] == b'a' && !input.starts_with(b"argc") =>
-        {
-            terminated(
-                alt((parse_key_a_x_len, parse_key_a_xy, parse_key_a_x)),
-                tag("="),
-            )(input)
-        }
-        // Special case for syscall params: aX
-        MessageType::SYSCALL => terminated(alt((parse_key_a_x, parse_key)), tag("="))(input),
-        _ => terminated(parse_key, tag("="))(input),
-    }?;
-
-    let (input, value) = match (ty, &key) {
-        (MessageType::SYSCALL, Key::Arg(_, None)) => map(
-            recognize(terminated(
-                many1_count(take_while1(is_hex_digit)),
-                peek(take_while1(is_sep)),
-            )),
-            |s| {
-                let ps = unsafe { str::from_utf8_unchecked(s) };
-                match u64::from_str_radix(ps, 16) {
-                    Ok(n) => Value::Number(Number::Hex(n)),
-                    Err(_) => Value::Str(s, Quote::None),
-                }
-            },
-        )(input)?,
-        (MessageType::SYSCALL, Key::Common(c)) => parse_common(input, ty, *c)?,
-        (MessageType::EXECVE, Key::Arg(_, _)) => parse_encoded(input)?,
-        (MessageType::EXECVE, Key::ArgLen(_)) => parse_dec(input)?,
-        (_, Key::Name(name)) => parse_named(input, ty, name)?,
-        (_, Key::Common(c)) => parse_common(input, ty, *c)?,
-        (_, Key::NameUID(name)) | (_, Key::NameGID(name)) => {
-            alt((parse_dec, |input| parse_unspec_value(input, ty, name)))(input)?
-        }
-        _ => parse_encoded(input)?,
-    };
-
-    Ok((input, (key, value)))
-}
-
 #[inline(always)]
 fn parse_named<'a>(input: &'a [u8], ty: MessageType, name: &[u8]) -> IResult<&'a [u8], Value<'a>> {
     match FIELD_TYPES.get(name) {
@@ -274,37 +331,6 @@ fn parse_named<'a>(input: &'a [u8], ty: MessageType, name: &[u8]) -> IResult<&'a
         }
         // FIXME: Some(&FieldType::Numeric)
         _ => alt((parse_encoded, |input| parse_unspec_value(input, ty, name)))(input),
-    }
-}
-
-#[inline(always)]
-fn parse_common(input: &[u8], ty: MessageType, c: Common) -> IResult<&[u8], Value> {
-    let name = <&str>::from(c).as_bytes();
-    match c {
-        Common::Arch | Common::CapFi | Common::CapFp | Common::CapFver => {
-            alt((parse_hex, |input| parse_unspec_value(input, ty, name)))(input)
-        }
-        Common::Argc
-        | Common::Exit
-        | Common::CapFe
-        | Common::Inode
-        | Common::Item
-        | Common::Items
-        | Common::Pid
-        | Common::PPid
-        | Common::Ses
-        | Common::Syscall => alt((parse_dec, |input| parse_unspec_value(input, ty, name)))(input),
-        Common::Success
-        | Common::Cwd
-        | Common::Dev
-        | Common::Tty
-        | Common::Comm
-        | Common::Exe
-        | Common::Name
-        | Common::Nametype
-        | Common::Subj
-        | Common::Key => alt((parse_encoded, |input| parse_unspec_value(input, ty, name)))(input),
-        Common::Mode => alt((parse_oct, |input| parse_unspec_value(input, ty, name)))(input),
     }
 }
 
@@ -447,6 +473,20 @@ fn parse_str_unq_inside_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
     take_while(|c| is_safe_chr(c) && c != b'\'')(input)
 }
 
+#[inline(always)]
+fn parse_str_words_inside_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    let mut rest = input;
+    loop {
+        (rest, _) = take_while(|c| !b"' ".contains(&c))(rest)?;
+        if let Ok(_) = alt((recognize(tuple((space1, parse_key, tag("=")))), tag("'")))(rest) {
+            break;
+        }
+        (rest, _) = space1(rest)?;
+    }
+    let l = input.len() - rest.len();
+    Ok((rest, &input[..l]))
+}
+
 /// More "correct" variant of parse_str_sq
 #[inline(always)]
 fn parse_kv_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -461,6 +501,33 @@ fn parse_kv_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
             )),
         )),
         tag("'"),
+    )(input)
+}
+
+/// Recognize a map enclosed in single quotes
+#[inline(always)]
+fn parse_kv_sq_as_map(input: &[u8]) -> IResult<&[u8], Value> {
+    map(
+        delimited(
+            tag("'"),
+            separated_list0(
+                space1,
+                alt((separated_pair(
+                    parse_key,
+                    alt((
+                        tag("="),
+                        recognize(tuple((tag(":"), space0))), // for 'avc:  mumble mumble mumble …'
+                    )),
+                    alt((
+                        parse_encoded,
+                        map(parse_str_words_inside_sq, |v| Value::Str(v, Quote::None)),
+                        map(parse_str_unq_inside_sq, |v| Value::Str(v, Quote::None)),
+                    )),
+                ),)),
+            ),
+            tag("'"),
+        ),
+        Value::Map,
     )(input)
 }
 

@@ -1,0 +1,1 @@
+type=USER_MGMT msg=audit(1725003240.604:28251307): pid=18970 uid=0 auid=4294967295 ses=4294967295 msg='op=change-age acct="" exe="/usr/bin/chage" hostname=? addr=? terminal=? res=failed'UID="root" AUID="unset"

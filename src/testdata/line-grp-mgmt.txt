@@ -1,0 +1,1 @@
+type=GRP_MGMT msg=audit(1724970841.047:3517): pid=14406 uid=0 auid=4294967295 ses=4294967295 msg='op=add-shadow-group id=990 exe="/usr/sbin/groupadd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset" ID="docker"

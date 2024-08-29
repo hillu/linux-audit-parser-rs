@@ -1,0 +1,1 @@
+type=USER_LOGOUT msg=audit(1725003193.331:117292): pid=1712 uid=0 auid=1000 ses=764 msg='op=login id=1000 exe="/usr/sbin/sshd" hostname=other-host.invalid addr=10.10.10.10 terminal=ssh res=success'UID="root" AUID="ec2-user" ID="ec2-user"

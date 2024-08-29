@@ -1,0 +1,1 @@
+type=CRED_ACQ msg=audit(1725004861.996:747421): pid=26752 uid=0 auid=4294967295 ses=4294967295 msg='op=PAM:setcred grantors=pam_env,pam_unix acct="root" exe="/usr/sbin/crond" hostname=? addr=? terminal=cron res=success'UID="root" AUID="unset"

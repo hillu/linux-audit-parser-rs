@@ -1,0 +1,1 @@
+type=USER_SELINUX_ERR msg=audit(1720378109.983:2630177): pid=1572772 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='avc:  netlink recvfrom: error 9  exe="/usr/lib/systemd/systemd" sauid=0 hostname=? addr=? terminal=?'

@@ -1,0 +1,1 @@
+type=ACCT_LOCK msg=audit(1725000411.409:1065): pid=2352 uid=0 auid=4294967295 ses=4294967295 msg='op=locked-password id=1000 exe="/usr/bin/passwd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset" ID="ec2-user"

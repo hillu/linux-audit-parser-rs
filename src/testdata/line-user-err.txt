@@ -1,0 +1,1 @@
+type=USER_ERR msg=audit(1724985521.124:28189957): pid=164518 uid=0 auid=4294967295 ses=4294967295 msg='op=PAM:bad_ident grantors=? acct="?" exe="/usr/sbin/sshd" hostname=10.105.231.56 addr=10.105.231.56 terminal=ssh res=failed'UID="root" AUID="unset"

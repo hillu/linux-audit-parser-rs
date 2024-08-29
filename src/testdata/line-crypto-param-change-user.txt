@@ -1,0 +1,1 @@
+type=CRYPTO_PARAM_CHANGE_USER msg=audit(1720042308.296:1823003): pid=2640 uid=0 auid=4294967295 ses=4294967295 msg='op=prng_seed kind=server bytes=6 source=/dev/urandom  exe="/usr/sbin/sshd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"

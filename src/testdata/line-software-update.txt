@@ -1,0 +1,1 @@
+type=SOFTWARE_UPDATE msg=audit(1724947731.641:5836352): pid=3312968 uid=0 auid=4294967295 ses=4294967295 subj=kernel msg='op=install sw="yum-utils-4.0.21-25.el8.noarch" sw_type=rpm key_enforce=0 gpg_res=1 root_dir="/" comm="yum" exe="/usr/libexec/platform-python3.6" hostname=8da7ccbba3a1 addr=? terminal=pts/0 res=success'UID="root" AUID="unset"

@@ -1,0 +1,1 @@
+type=CRED_REFR msg=audit(1725004605.807:105662): pid=14548 uid=0 auid=4294967295 ses=4294967295 msg='op=PAM:setcred grantors=pam_env,pam_unix acct="root" exe="/usr/bin/sudo" hostname=? addr=? terminal=/dev/pts/0 res=success'

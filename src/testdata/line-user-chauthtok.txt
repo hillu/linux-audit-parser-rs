@@ -1,0 +1,1 @@
+type=USER_CHAUTHTOK msg=audit(1725004607.540:730609): pid=393655 uid=0 auid=4294967295 ses=4294967295 subj=unconfined msg='op=display aging info id=0 exe="/usr/bin/chage" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset" ID="root"
