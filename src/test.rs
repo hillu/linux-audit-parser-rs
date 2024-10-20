@@ -431,3 +431,43 @@ fn breakage_sockaddr_unknown() {
     )
     .expect("can't parse line-sockaddr-unknown-3.txt");
 }
+
+#[test]
+fn optional_newline() {
+    for line in [
+        &include_bytes!("testdata/line-acct-lock.txt")[..],
+        &include_bytes!("testdata/line-add-group.txt")[..],
+        &include_bytes!("testdata/line-add-user.txt")[..],
+        &include_bytes!("testdata/line-chgrp-id.txt")[..],
+        &include_bytes!("testdata/line-cred-acq.txt")[..],
+        &include_bytes!("testdata/line-cred-disp.txt")[..],
+        &include_bytes!("testdata/line-cred-refr.txt")[..],
+        &include_bytes!("testdata/line-crypto-key-user.txt")[..],
+        &include_bytes!("testdata/line-crypto-session.txt")[..],
+        &include_bytes!("testdata/line-crypto-param-change-user.txt")[..],
+        &include_bytes!("testdata/line-daemon-end-2.txt")[..],
+        &include_bytes!("testdata/line-del-group.txt")[..],
+        &include_bytes!("testdata/line-del-user.txt")[..],
+        &include_bytes!("testdata/line-grp-mgmt.txt")[..],
+        &include_bytes!("testdata/line-software-update.txt")[..],
+        &include_bytes!("testdata/line-user-acct.txt")[..],
+        &include_bytes!("testdata/line-user-auth.txt")[..],
+        &include_bytes!("testdata/line-user-auth-2.txt")[..],
+        &include_bytes!("testdata/line-user-chauthtok.txt")[..],
+        &include_bytes!("testdata/line-user-end.txt")[..],
+        &include_bytes!("testdata/line-user-err.txt")[..],
+        &include_bytes!("testdata/line-user-login.txt")[..],
+        &include_bytes!("testdata/line-user-logout.txt")[..],
+        &include_bytes!("testdata/line-user-mgmt.txt")[..],
+        &include_bytes!("testdata/line-user-role-change.txt")[..],
+        &include_bytes!("testdata/line-user-start.txt")[..],
+        &include_bytes!("testdata/line-usys-config.txt")[..],
+        &include_bytes!("testdata/line-user-avc-1.txt")[..],
+        &include_bytes!("testdata/line-user-avc-2.txt")[..],
+        &include_bytes!("testdata/line-user-selinux-err.txt")[..],
+    ] {
+        let trimmed_line = line.trim_ascii();
+        let result = parse(trimmed_line, true);
+        assert!(result.is_ok(), "Failed to parse: {:?}", result);
+    }
+}
