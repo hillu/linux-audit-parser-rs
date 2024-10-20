@@ -188,3 +188,11 @@ impl<'a> IntoIterator for &'a Body<'a> {
         self.elems.iter()
     }
 }
+
+impl<'a> IntoIterator for Body<'a> {
+    type Item = (Key, Value<'a>);
+    type IntoIter = std::vec::IntoIter<(Key, Value<'a>)>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.elems.into_iter()
+    }
+}
