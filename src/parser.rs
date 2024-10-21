@@ -145,8 +145,11 @@ impl Parser {
             terminated(
                 separated_list0(tag(b" "), |input| self.parse_kv(input, ty)),
                 alt((
-                    value((), tuple((tag("\x1d"), is_not("\n"), tag("\n")))),
-                    value((), tag("\n")),
+                    value(
+                        (),
+                        tuple((tag("\x1d"), is_not("\n"), alt((tag("\n"), eof)))),
+                    ),
+                    value((), alt((tag("\n"), eof))),
                 )),
             )(input)?
         } else {
@@ -154,7 +157,7 @@ impl Parser {
                 separated_list0(take_while1(|c| c == b' ' || c == b'\x1d'), |input| {
                     self.parse_kv(input, ty)
                 }),
-                newline,
+                alt((tag("\n"), eof)),
             )(input)?
         };
 
@@ -432,14 +435,14 @@ fn parse_unspec_value<'a>(
             map(take_while1(is_safe_unquoted_chr), |s| {
                 Value::Str(s, Quote::None)
             }),
-            peek(take_while1(is_sep)),
+            peek(take_while(is_sep)),
         ),
         map(parse_kv_sq, |s| Value::Str(s, Quote::Single)),
         map(parse_str_sq, |s| Value::Str(s, Quote::Single)),
         map(parse_str_dq, |s| Value::Str(s, Quote::Double)),
         map(parse_kv_braced, |s| Value::Str(s, Quote::Braces)),
         map(parse_str_braced, |s| Value::Str(s, Quote::Braces)),
-        value(Value::Empty, peek(take_while1(is_sep))),
+        value(Value::Empty, peek(take_while(is_sep))),
     ))(input)
 }
 
