@@ -478,7 +478,7 @@ fn parse_str_words_inside_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let mut rest = input;
     loop {
         (rest, _) = take_while(|c| !b"' ".contains(&c))(rest)?;
-        if let Ok(_) = alt((recognize(tuple((space1, parse_key, tag("=")))), tag("'")))(rest) {
+        if alt((recognize(tuple((space1, parse_key, tag("=")))), tag("'")))(rest).is_ok() {
             break;
         }
         (rest, _) = space1(rest)?;
