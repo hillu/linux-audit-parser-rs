@@ -404,7 +404,7 @@ fn test_msg_kv() {
         let msg = m
             .body
             .get("msg")
-            .expect(&format!("{}: Field msg not found", m.id));
+            .unwrap_or_else(|| panic!("{}: Field msg not found", m.id));
         match msg {
             Value::Map(_) => {}
             Value::Str(_, _) => panic!("{}: Field msg was parsed as string", m.id),
