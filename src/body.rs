@@ -104,20 +104,13 @@ impl Body<'_> {
             Value::Str(s, q) => Value::Str(self.add_slice(s), q),
             Value::Owned(s) => Value::Str(self.add_slice(s.as_slice()), Quote::None),
             Value::List(vs) => Value::List(vs.into_iter().map(|v| self.add_value(v)).collect()),
-            Value::StringifiedList(vs) => {
-                Value::StringifiedList(vs.into_iter().map(|v| self.add_value(v)).collect())
-            }
-            Value::Segments(vs) => {
-                let vs = vs.iter().map(|s| self.add_slice(s)).collect();
-                Value::Segments(vs)
-            }
             Value::Map(vs) => Value::Map(
                 vs.into_iter()
                     .map(|(k, v)| (k, self.add_value(v)))
                     .collect(),
             ),
             // safety: These enum variants are self-contained.
-            Value::Empty | Value::Literal(_) | Value::Number(_) | Value::Skipped(_) => unsafe {
+            Value::Empty | Value::Number(_) => unsafe {
                 std::mem::transmute::<Value<'i>, Value<'a>>(v)
             },
         }

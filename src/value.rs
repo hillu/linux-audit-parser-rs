@@ -5,7 +5,7 @@ use std::str;
 use std::string::*;
 
 #[cfg(feature = "serde")]
-use serde::{ser::SerializeMap, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 
 use crate::*;
 
@@ -67,15 +67,8 @@ pub enum Value<'a> {
     /// A byte string that is not stored within the [`Body`]. Used for
     /// decoded hex-strings.
     Owned(Vec<u8>),
-    /// An internal key/value map. Not currently produced by the parser.
+    /// An internal key/value map.
     Map(Vec<(Key, Value<'a>)>),
-    /// Non-contiguous byte string. Not produced by the parser.
-    Segments(Vec<&'a [u8]>),
-    StringifiedList(Vec<Value<'a>>),
-    /// Elements removed from ARGV lists. Not produced by the parser.
-    Skipped((usize, usize)),
-    /// A literal string. Not produced by the parser.
-    Literal(&'static str),
 }
 
 impl Default for Value<'_> {
@@ -88,7 +81,6 @@ impl Value<'_> {
     pub fn str_len(&self) -> usize {
         match self {
             Value::Str(r, _) => r.len(),
-            Value::Segments(vr) => vr.iter().map(|r| r.len()).sum(),
             _ => 0,
         }
     }
@@ -107,19 +99,9 @@ impl TryFrom<Value<'_>> for Vec<u8> {
             }
             Value::Str(r, _) => Ok(Vec::from(r)),
             Value::Empty => Ok("".into()),
-            Value::Segments(ranges) => {
-                let l = ranges.iter().map(|r| r.len()).sum();
-                let mut sb = Vec::with_capacity(l);
-                for r in ranges {
-                    sb.extend(Vec::from(r));
-                }
-                Ok(sb)
-            }
             Value::Number(_) => Err("Won't convert number to string"),
-            Value::List(_) | Value::StringifiedList(_) => Err("Can't convert list to scalar"),
+            Value::List(_) => Err("Can't convert list to scalar"),
             Value::Map(_) => Err("Can't convert map to scalar"),
-            Value::Skipped(_) => Err("Can't convert skipped to scalar"),
-            Value::Literal(s) => Ok(s.to_string().into()),
             Value::Owned(v) => Ok(v),
         }
     }
@@ -129,7 +111,7 @@ impl TryFrom<Value<'_>> for Vec<Vec<u8>> {
     type Error = &'static str;
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
-            Value::List(values) | Value::StringifiedList(values) => {
+            Value::List(values) => {
                 let mut rv = Vec::with_capacity(values.len());
                 for v in values {
                     let s = Vec::try_from(v)?;
@@ -147,16 +129,6 @@ impl Debug for Value<'_> {
         match self {
             Value::Str(r, _q) => write!(f, "Str:<{}>", &String::from_utf8_lossy(r)),
             Value::Empty => write!(f, "Empty"),
-            Value::Segments(segs) => {
-                write!(f, "Segments<")?;
-                for (n, r) in segs.iter().enumerate() {
-                    if n > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", String::from_utf8_lossy(r))?;
-                }
-                write!(f, ">")
-            }
             Value::List(vs) => {
                 write!(f, "List:<")?;
                 for (n, v) in vs.iter().enumerate() {
@@ -167,51 +139,12 @@ impl Debug for Value<'_> {
                         Value::Str(r, _) => {
                             write!(f, "{}", String::from_utf8_lossy(r))?;
                         }
-                        Value::Segments(rs) => {
-                            for r in rs {
-                                write!(f, "{}", String::from_utf8_lossy(r))?;
-                            }
-                        }
                         Value::Number(n) => write!(f, "{n:?}")?,
-                        Value::Skipped((elems, bytes)) => {
-                            write!(f, "Skip<elems{elems} bytes={bytes}>")?;
-                        }
                         Value::Empty => panic!("list can't contain empty value"),
-                        Value::List(_) | Value::StringifiedList(_) => {
+                        Value::List(_) => {
                             panic!("list can't contain list")
                         }
                         Value::Map(_) => panic!("list can't contain map"),
-                        Value::Literal(v) => write!(f, "{v:?}")?,
-                        Value::Owned(v) => write!(f, "{}", String::from_utf8_lossy(v))?,
-                    }
-                }
-                write!(f, ">")
-            }
-            Value::StringifiedList(vs) => {
-                write!(f, "StringifiedList:<")?;
-                for (n, v) in vs.iter().enumerate() {
-                    if n > 0 {
-                        write!(f, " ")?;
-                    }
-                    match v {
-                        Value::Str(r, _) => {
-                            write!(f, "{}", String::from_utf8_lossy(r))?;
-                        }
-                        Value::Segments(rs) => {
-                            for r in rs {
-                                write!(f, "{}", String::from_utf8_lossy(r))?;
-                            }
-                        }
-                        Value::Number(n) => write!(f, "{n:?}")?,
-                        Value::Skipped((elems, bytes)) => {
-                            write!(f, "Skip<elems={elems} bytes={bytes}>")?;
-                        }
-                        Value::Empty => panic!("list can't contain empty value"),
-                        Value::List(_) | Value::StringifiedList(_) => {
-                            panic!("list can't contain list")
-                        }
-                        Value::Map(_) => panic!("List can't contain mapr"),
-                        Value::Literal(v) => write!(f, "{v}")?,
                         Value::Owned(v) => write!(f, "{}", String::from_utf8_lossy(v))?,
                     }
                 }
@@ -228,8 +161,6 @@ impl Debug for Value<'_> {
                 write!(f, ">")
             }
             Value::Number(n) => write!(f, "{n:?}"),
-            Value::Skipped((elems, bytes)) => write!(f, "Skip<elems={elems} bytes={bytes}>"),
-            Value::Literal(s) => write!(f, "{s:?}"),
             Value::Owned(v) => write!(f, "{}", String::from_utf8_lossy(v)),
         }
     }
@@ -249,41 +180,9 @@ impl Serialize for Value<'_> {
                 s.serialize_bytes(&buf)
             }
             Value::Str(r, _) => s.serialize_bytes(r),
-            Value::Segments(segs) => {
-                let l = segs.iter().map(|r| r.len()).sum();
-                let mut buf = Vec::with_capacity(l);
-                for seg in segs {
-                    buf.extend(*seg);
-                }
-                s.serialize_bytes(&buf)
-            }
             Value::List(vs) => s.collect_seq(vs.iter()),
-            Value::StringifiedList(vs) => {
-                let mut buf: Vec<u8> = Vec::with_capacity(vs.len());
-                let mut first = true;
-                for v in vs {
-                    if first {
-                        first = false;
-                    } else {
-                        buf.push(b' ');
-                    }
-                    if let Value::Skipped((args, bytes)) = v {
-                        buf.extend(format!("<<< Skipped: args={args}, bytes={bytes} >>>").bytes());
-                    } else {
-                        buf.extend(v.clone().try_into().unwrap_or_else(|_| vec![b'x']));
-                    }
-                }
-                s.serialize_bytes(&buf)
-            }
             Value::Number(n) => n.serialize(s),
             Value::Map(vs) => s.collect_map(vs.iter().cloned()),
-            Value::Skipped((args, bytes)) => {
-                let mut map = s.serialize_map(Some(2))?;
-                map.serialize_entry("skipped_args", args)?;
-                map.serialize_entry("skipped_bytes", bytes)?;
-                map.end()
-            }
-            Value::Literal(v) => s.collect_str(v),
             Value::Owned(v) => Bytes(v).serialize(s),
         }
     }
@@ -300,21 +199,8 @@ impl PartialEq<[u8]> for Value<'_> {
         match self {
             Value::Empty => other.is_empty(),
             Value::Str(r, _) => r == &other,
-            Value::Segments(segs) => {
-                let l = segs.iter().map(|s| s.len()).sum();
-                let mut buf: Vec<u8> = Vec::with_capacity(l);
-                for s in segs {
-                    buf.extend(*s);
-                }
-                buf == other
-            }
-            Value::Literal(s) => s.as_bytes() == other,
             Value::Owned(v) => v == other,
-            Value::List(_)
-            | Value::StringifiedList(_)
-            | Value::Map(_)
-            | Value::Skipped(_)
-            | Value::Number(_) => false,
+            Value::List(_) | Value::Map(_) | Value::Number(_) => false,
         }
     }
 }
