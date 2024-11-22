@@ -188,3 +188,28 @@ impl<'a> IntoIterator for &'a Body<'a> {
         self.elems.iter()
     }
 }
+
+pub struct BodyIterator<'a> {
+    iter: std::vec::IntoIter<(Key, Value<'a>)>,
+    _arena: Vec<Vec<u8>>,
+    _pin: std::marker::PhantomPinned,
+}
+
+impl<'a> Iterator for BodyIterator<'a> {
+    type Item = (Key, Value<'a>);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
+}
+
+impl<'a> IntoIterator for Body<'a> {
+    type Item = (Key, Value<'a>);
+    type IntoIter = BodyIterator<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            iter: self.elems.into_iter(),
+            _arena: self.arena,
+            _pin: std::marker::PhantomPinned,
+        }
+    }
+}
