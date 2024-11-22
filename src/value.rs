@@ -10,7 +10,7 @@ use serde::{ser::SerializeMap, Serialize, Serializer};
 use crate::*;
 
 /// Quotes types in [`Value`] strings
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Quote {
     None,
     Single,
