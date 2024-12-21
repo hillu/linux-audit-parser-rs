@@ -354,7 +354,7 @@ impl From<i64> for Value<'_> {
 pub(crate) struct Bytes<'a>(pub &'a [u8]);
 
 #[cfg(feature = "serde")]
-impl<'a> Serialize for Bytes<'a> {
+impl Serialize for Bytes<'_> {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         s.serialize_bytes(self.0)
     }

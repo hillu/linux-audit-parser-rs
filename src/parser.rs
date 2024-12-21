@@ -100,7 +100,7 @@ impl Parser {
         &'a self,
         input: &'a [u8],
         ty: MessageType,
-    ) -> IResult<&'a [u8], Vec<(Key, Value)>> {
+    ) -> IResult<&'a [u8], Vec<(Key, Value<'a>)>> {
         // Handle some corner cases that don't fit the general key=value
         // scheme.
         let (input, special) = match ty {
@@ -167,7 +167,11 @@ impl Parser {
 
     /// Recognize one key/value pair
     #[inline(always)]
-    fn parse_kv<'a>(&'a self, input: &'a [u8], ty: MessageType) -> IResult<&'a [u8], (Key, Value)> {
+    fn parse_kv<'a>(
+        &'a self,
+        input: &'a [u8],
+        ty: MessageType,
+    ) -> IResult<&'a [u8], (Key, Value<'a>)> {
         let (input, key) = match ty {
             // Special case for execve arguments: aX, aX[Y], aX_len
             MessageType::EXECVE
@@ -217,7 +221,7 @@ impl Parser {
         input: &'a [u8],
         ty: MessageType,
         c: Common,
-    ) -> IResult<&'a [u8], Value> {
+    ) -> IResult<&'a [u8], Value<'a>> {
         let name = <&str>::from(c).as_bytes();
         match c {
             Common::Arch | Common::CapFi | Common::CapFp | Common::CapFver => {
