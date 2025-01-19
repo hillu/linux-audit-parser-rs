@@ -1,5 +1,8 @@
 use crate::*;
 
+#[cfg(feature = "serde")]
+use serde_test::{assert_ser_tokens, Token};
+
 #[test]
 fn parser() {
     // ensure that constant init works
@@ -430,4 +433,86 @@ fn breakage_sockaddr_unknown() {
         false,
     )
     .expect("can't parse line-sockaddr-unknown-3.txt");
+}
+
+#[test]
+#[cfg(feature = "serde")]
+fn serde_messagetype() {
+    assert_ser_tokens(&MessageType::SYSCALL, &[Token::String("SYSCALL")]);
+    assert_ser_tokens(&MessageType(20000), &[Token::String("UNKNOWN[20000]")]);
+}
+
+#[test]
+#[cfg(feature = "serde")]
+fn serde_key() {
+    assert_ser_tokens(&Key::Name(b"foo"[..].into()), &[Token::String("foo")]);
+    assert_ser_tokens(&Key::NameUID(b"euid"[..].into()), &[Token::String("euid")]);
+    assert_ser_tokens(&Key::NameGID(b"egid"[..].into()), &[Token::String("egid")]);
+    assert_ser_tokens(&Key::Common(Common::Arch), &[Token::String("arch")]);
+    assert_ser_tokens(
+        &Key::NameTranslated(b"foo"[..].into()),
+        &[Token::String("FOO")],
+    );
+    assert_ser_tokens(&Key::Arg(1, None), &[Token::String("a1")]);
+    assert_ser_tokens(&Key::Arg(2, Some(3)), &[Token::String("a2[3]")]);
+    assert_ser_tokens(&Key::ArgLen(2), &[Token::String("a2_len")]);
+    assert_ser_tokens(&Key::Literal("foo"), &[Token::String("foo")]);
+}
+
+#[test]
+#[cfg(feature = "serde")]
+fn serde_value() {
+    assert_ser_tokens(&Value::Empty, &[Token::None]);
+    for q in &[Quote::None, Quote::Single, Quote::Double] {
+        assert_ser_tokens(&Value::Str(&b"foo"[..], *q), &[Token::Bytes(b"foo")]);
+    }
+    assert_ser_tokens(
+        &Value::Str(&b"foo"[..], Quote::Braces),
+        &[Token::Bytes(b"{foo}")],
+    );
+
+    assert_ser_tokens(&Value::Number(Number::Hex(16)), &[Token::String("0x10")]);
+    assert_ser_tokens(&Value::Number(Number::Oct(16)), &[Token::String("0o20")]);
+    assert_ser_tokens(&Value::Number(Number::Dec(16)), &[Token::I64(16)]);
+
+    assert_ser_tokens(
+        &Value::List(vec![]),
+        &[Token::Seq { len: Some(0) }, Token::SeqEnd],
+    );
+    assert_ser_tokens(
+        &Value::List(vec![
+            Value::from("foo"),
+            Value::from("bar"),
+            Value::from("baz"),
+            Value::from(42),
+        ]),
+        &[
+            Token::Seq { len: Some(4) },
+            Token::Bytes(b"foo"),
+            Token::Bytes(b"bar"),
+            Token::Bytes(b"baz"),
+            Token::I64(42),
+            Token::SeqEnd,
+        ],
+    );
+}
+
+#[test]
+#[cfg(feature = "serde")]
+fn serde_message() {
+    let msg = parse(include_bytes!("testdata/line-eoe.txt"), false).unwrap();
+    assert_ser_tokens(&msg.body, &[Token::Map { len: Some(0) }, Token::MapEnd]);
+
+    let msg = parse(include_bytes!("testdata/line-execve.txt"), false).unwrap();
+    assert_ser_tokens(
+        &msg.body,
+        &[
+            Token::Map { len: Some(2) },
+            Token::String("argc"),
+            Token::I64(0),
+            Token::String("a0"),
+            Token::Bytes(b"whoami"),
+            Token::MapEnd,
+        ],
+    );
 }

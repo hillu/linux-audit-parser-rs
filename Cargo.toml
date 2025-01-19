@@ -19,3 +19,6 @@ tinyvec = { version = "1.6", features = ["alloc"] }
 [features]
 serde = ["dep:serde"]
 default = ["serde"]
+
+[dev-dependencies]
+serde_test = "1.0.177"
