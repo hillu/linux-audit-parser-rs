@@ -37,12 +37,9 @@ impl Debug for Body<'_> {
 impl Serialize for Body<'_> {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        let mut map = s.serialize_map(None)?;
+        let mut map = s.serialize_map(Some(self.elems.len()))?;
         for (k, v) in self.into_iter() {
-            match k {
-                Key::Arg(_, _) | Key::ArgLen(_) => continue,
-                _ => map.serialize_entry(&k, &v)?,
-            }
+            map.serialize_entry(&k, &v)?;
         }
         map.end()
     }
