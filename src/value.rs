@@ -67,7 +67,7 @@ pub enum Value<'a> {
     /// A byte string that is not stored within the [`Body`]. Used for
     /// decoded hex-strings.
     Owned(Vec<u8>),
-    /// An internal key/value map. Not currently produced by the parser.
+    /// An internal key/value map. Used when [`Parser::split_msg`] is set.
     Map(Vec<(Key, Value<'a>)>),
     /// Non-contiguous byte string. Not produced by the parser.
     Segments(Vec<&'a [u8]>),
