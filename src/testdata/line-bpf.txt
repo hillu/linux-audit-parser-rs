@@ -1,0 +1,1 @@
+type=BPF msg=audit(1737533267.765:12263987): prog-id=75 op=LOAD

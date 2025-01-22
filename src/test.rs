@@ -516,3 +516,27 @@ fn serde_message() {
         ],
     );
 }
+
+#[test]
+#[should_panic]
+fn parse_uringop() {
+    let msg = parse(include_bytes!("testdata/line-uringop.txt"), false).unwrap();
+    println!("{msg:?}");
+    let v = msg
+        .body
+        .get("uring_op")
+        .unwrap_or_else(|| panic!("{}: uring_op not found", msg.id));
+    assert_eq!(*v, Value::Number(Number::Dec(18)));
+}
+
+#[test]
+#[should_panic]
+fn parse_bpf() {
+    let msg = parse(include_bytes!("testdata/line-bpf.txt"), false).unwrap();
+    println!("{msg:?}");
+    let v = msg
+        .body
+        .get("prog-id")
+        .unwrap_or_else(|| panic!("{}: prog-id not found", msg.id));
+    assert_eq!(*v, Value::Number(Number::Dec(75)));
+}
