@@ -518,7 +518,6 @@ fn serde_message() {
 }
 
 #[test]
-#[should_panic]
 fn parse_uringop() {
     let msg = parse(include_bytes!("testdata/line-uringop.txt"), false).unwrap();
     println!("{msg:?}");
@@ -530,7 +529,6 @@ fn parse_uringop() {
 }
 
 #[test]
-#[should_panic]
 fn parse_bpf() {
     let msg = parse(include_bytes!("testdata/line-bpf.txt"), false).unwrap();
     println!("{msg:?}");
