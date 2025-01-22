@@ -13,6 +13,12 @@ pub struct Body<'a> {
     _pin: std::marker::PhantomPinned,
 }
 
+impl<'a> PartialEq<Body<'a>> for Body<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.elems == other.elems
+    }
+}
+
 impl Default for Body<'_> {
     fn default() -> Self {
         Body {

@@ -18,7 +18,7 @@ pub enum Quote {
     Braces,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 /// [`Value`]s parsed as hexadecimal, decimal, or octal numbers
 pub enum Number {
     Hex(u64),
@@ -54,7 +54,7 @@ impl Serialize for Number {
 }
 
 /// Representation of the value part of key/value pairs in [`Body`]
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Value<'a> {
     /// Empty value.
     Empty,
