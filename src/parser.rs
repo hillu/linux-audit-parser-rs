@@ -143,7 +143,7 @@ impl Parser {
 
         let (input, mut kv) = if !self.enriched {
             terminated(
-                separated_list0(tag(b" "), |input| self.parse_kv(input, ty)),
+                separated_list0(take_while1(|c| c == b' '), |input| self.parse_kv(input, ty)),
                 alt((
                     value((), tuple((tag("\x1d"), is_not("\n"), tag("\n")))),
                     value((), tag("\n")),
