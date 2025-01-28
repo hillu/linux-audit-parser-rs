@@ -352,16 +352,80 @@ fn parser() {
         )
     );
 
-    parse(include_bytes!("testdata/line-daemon-end.txt"), false).unwrap();
-    parse(include_bytes!("testdata/line-netfilter.txt"), false).unwrap();
-    parse(include_bytes!("testdata/line-anom-abend.txt"), false).unwrap();
-    parse(include_bytes!("testdata/line-anom-abend-2.txt"), false).unwrap();
-    parse(include_bytes!("testdata/line-user-auth.txt"), false).unwrap();
-    parse(include_bytes!("testdata/line-sockaddr-unix.txt"), false).unwrap();
-    parse(include_bytes!("testdata/line-sockaddr-unix-2.txt"), false).unwrap();
-    parse(include_bytes!("testdata/line-user-auth-2.txt"), false).unwrap();
-    parse(include_bytes!("testdata/line-mac-policy-load.txt"), false).unwrap();
-    parse(include_bytes!("testdata/line-tty.txt"), false).unwrap();
+    for enriched in [true, false] {
+        for split_msg in [true, false] {
+            for (n, line) in [
+                &include_bytes!("testdata/line-acct-lock.txt")[..],
+                &include_bytes!("testdata/line-add-group.txt")[..],
+                &include_bytes!("testdata/line-add-user.txt")[..],
+                &include_bytes!("testdata/line-anom-abend-2.txt")[..],
+                &include_bytes!("testdata/line-anom-abend.txt")[..],
+                &include_bytes!("testdata/line-avc-denied.txt")[..],
+                &include_bytes!("testdata/line-avc-granted.txt")[..],
+                &include_bytes!("testdata/line-bpf.txt")[..],
+                &include_bytes!("testdata/line-broken-avc-info.txt")[..],
+                &include_bytes!("testdata/line-broken-subj1.txt")[..],
+                &include_bytes!("testdata/line-broken-subj2.txt")[..],
+                &include_bytes!("testdata/line-chgrp-id.txt")[..],
+                &include_bytes!("testdata/line-cred-acq.txt")[..],
+                &include_bytes!("testdata/line-cred-disp.txt")[..],
+                &include_bytes!("testdata/line-cred-refr.txt")[..],
+                &include_bytes!("testdata/line-crypto-key-user.txt")[..],
+                &include_bytes!("testdata/line-crypto-param-change-user.txt")[..],
+                &include_bytes!("testdata/line-crypto-session.txt")[..],
+                &include_bytes!("testdata/line-daemon-end-2.txt")[..],
+                &include_bytes!("testdata/line-daemon-end.txt")[..],
+                &include_bytes!("testdata/line-daemon-start.txt")[..],
+                &include_bytes!("testdata/line-del-group.txt")[..],
+                &include_bytes!("testdata/line-del-user.txt")[..],
+                &include_bytes!("testdata/line-eoe.txt")[..],
+                &include_bytes!("testdata/line-execve.txt")[..],
+                &include_bytes!("testdata/line-grp-mgmt.txt")[..],
+                &include_bytes!("testdata/line-mac-policy-load.txt")[..],
+                &include_bytes!("testdata/line-netfilter.txt")[..],
+                &include_bytes!("testdata/line-netlabel.txt")[..],
+                &include_bytes!("testdata/line-path-enriched.txt")[..],
+                &include_bytes!("testdata/line-path.txt")[..],
+                &include_bytes!("testdata/line-sockaddr-unix-2.txt")[..],
+                &include_bytes!("testdata/line-sockaddr-unix.txt")[..],
+                &include_bytes!("testdata/line-sockaddr-unknown-1.txt")[..],
+                &include_bytes!("testdata/line-sockaddr-unknown-2.txt")[..],
+                &include_bytes!("testdata/line-sockaddr-unknown-3.txt")[..],
+                &include_bytes!("testdata/line-software-update.txt")[..],
+                &include_bytes!("testdata/line-syscall.txt")[..],
+                &include_bytes!("testdata/line-tty.txt")[..],
+                &include_bytes!("testdata/line-unknown.txt")[..],
+                &include_bytes!("testdata/line-uringop.txt")[..],
+                &include_bytes!("testdata/line-user-acct.txt")[..],
+                &include_bytes!("testdata/line-user-auth-2.txt")[..],
+                &include_bytes!("testdata/line-user-auth.txt")[..],
+                &include_bytes!("testdata/line-user-avc-1.txt")[..],
+                &include_bytes!("testdata/line-user-avc-2.txt")[..],
+                &include_bytes!("testdata/line-user-chauthtok.txt")[..],
+                &include_bytes!("testdata/line-user-end.txt")[..],
+                &include_bytes!("testdata/line-user-err.txt")[..],
+                &include_bytes!("testdata/line-user-login.txt")[..],
+                &include_bytes!("testdata/line-user-logout.txt")[..],
+                &include_bytes!("testdata/line-user-mgmt.txt")[..],
+                &include_bytes!("testdata/line-user-role-change.txt")[..],
+                &include_bytes!("testdata/line-user-selinux-err.txt")[..],
+                &include_bytes!("testdata/line-user-start.txt")[..],
+                &include_bytes!("testdata/line-usys-config.txt")[..],
+            ]
+            .iter()
+            .enumerate()
+            {
+                Parser {
+                    enriched,
+                    split_msg,
+                }
+                .parse(line)
+                .expect(&format!(
+                    "failed to parse {n} (enriched={enriched}, split_msg={split_msg}"
+                ));
+            }
+        }
+    }
 }
 
 #[test]
@@ -370,7 +434,7 @@ fn test_msg_kv() {
         split_msg: true,
         ..Parser::default()
     };
-    for line in [
+    for (n, line) in [
         &include_bytes!("testdata/line-acct-lock.txt")[..],
         &include_bytes!("testdata/line-add-group.txt")[..],
         &include_bytes!("testdata/line-add-user.txt")[..],
@@ -401,17 +465,24 @@ fn test_msg_kv() {
         &include_bytes!("testdata/line-user-avc-1.txt")[..],
         &include_bytes!("testdata/line-user-avc-2.txt")[..],
         &include_bytes!("testdata/line-user-selinux-err.txt")[..],
-    ] {
-        let m = p.parse(line).unwrap();
-        println!("{:?}", &m);
-        let msg = m
-            .body
+    ]
+    .iter()
+    .enumerate()
+    {
+        let Message {
+            node: _,
+            ty: _,
+            id,
+            body,
+        } = p.parse(line).unwrap();
+        println!("test {n}: {id}: {body:?}");
+        let msg = body
             .get("msg")
-            .unwrap_or_else(|| panic!("{}: Field msg not found", m.id));
+            .expect(&format!("test {n}: {id}: Field msg not found"));
         match msg {
             Value::Map(_) => {}
-            Value::Str(_, _) => panic!("{}: Field msg was parsed as string", m.id),
-            _ => panic!("{}: Field msg was parsed as something else", m.id),
+            Value::Str(_, _) => panic!("test {n}: {id}: Field msg was parsed as string"),
+            _ => panic!("test {n}: {id}: Field msg was parsed as something else"),
         }
     }
 }
@@ -537,4 +608,15 @@ fn parse_bpf() {
         .get("prog-id")
         .unwrap_or_else(|| panic!("{}: prog-id not found", msg.id));
     assert_eq!(*v, Value::Number(Number::Dec(75)));
+}
+
+#[test]
+
+fn special() {
+    Parser {
+        enriched: false,
+        split_msg: false,
+    }
+    .parse(&include_bytes!("testdata/line-daemon-start.txt")[..])
+    .unwrap_or_else(|e| panic!("{e}"));
 }

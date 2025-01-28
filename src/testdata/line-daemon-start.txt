@@ -1,0 +1,1 @@
+type=DAEMON_START msg=audit(1738069334.056:5999): op=start ver=2.8.1 format=enriched kernel=4.12.14-122.231-default auid=4294967295 pid=32004 uid=0 ses=4294967295 subj=unconfined  res=successAUID="unset" UID="root"
