@@ -420,9 +420,9 @@ fn parser() {
                     split_msg,
                 }
                 .parse(line)
-                .expect(&format!(
-                    "failed to parse {n} (enriched={enriched}, split_msg={split_msg}"
-                ));
+                .unwrap_or_else(|_| {
+                    panic!("failed to parse {n} (enriched={enriched}, split_msg={split_msg}")
+                });
             }
         }
     }
@@ -478,7 +478,7 @@ fn test_msg_kv() {
         println!("test {n}: {id}: {body:?}");
         let msg = body
             .get("msg")
-            .expect(&format!("test {n}: {id}: Field msg not found"));
+            .unwrap_or_else(|| panic!("test {n}: {id}: Field msg not found"));
         match msg {
             Value::Map(_) => {}
             Value::Str(_, _) => panic!("test {n}: {id}: Field msg was parsed as string"),
