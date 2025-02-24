@@ -1,6 +1,6 @@
+use std::convert::Infallible;
 use std::fmt::{self, Debug, Display};
 use std::str::{self, FromStr};
-use std::convert::Infallible;
 
 #[cfg(feature = "serde")]
 use serde_with::{DeserializeFromStr, SerializeDisplay};
