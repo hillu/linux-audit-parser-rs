@@ -2,7 +2,11 @@ use std::fmt::{self, Debug};
 use std::ops::Range;
 
 #[cfg(feature = "serde")]
-use serde::{ser::SerializeMap, Serialize, Serializer};
+use serde::{
+    de::{MapAccess, Visitor},
+    ser::SerializeMap,
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 
 use crate::*;
 
@@ -48,6 +52,31 @@ impl Serialize for Body<'_> {
             map.serialize_entry(&k, &v)?;
         }
         map.end()
+    }
+}
+
+#[derive(Default)]
+struct BodyVisitor<'a>(std::marker::PhantomData<Body<'a>>);
+
+impl<'a, 'de> Visitor<'de> for BodyVisitor<'a> {
+    type Value = Body<'a>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a map")
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+        let mut body = Body::new();
+        while let Some((k, v)) = map.next_entry::<Key, Value>()? {
+            body.push((k, v));
+        }
+        Ok(body)
+    }
+}
+
+impl<'de> Deserialize<'de> for Body<'_> {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_map(BodyVisitor::default())
     }
 }
 

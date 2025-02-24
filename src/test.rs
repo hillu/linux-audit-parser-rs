@@ -1,7 +1,7 @@
 use crate::*;
 
 #[cfg(feature = "serde")]
-use serde_test::{assert_ser_tokens, Token};
+use serde_test::{assert_de_tokens, assert_ser_tokens, Token};
 
 #[test]
 fn parser() {
@@ -516,18 +516,28 @@ fn serde_messagetype() {
 #[test]
 #[cfg(feature = "serde")]
 fn serde_key() {
-    assert_ser_tokens(&Key::Name(b"foo"[..].into()), &[Token::String("foo")]);
-    assert_ser_tokens(&Key::NameUID(b"euid"[..].into()), &[Token::String("euid")]);
-    assert_ser_tokens(&Key::NameGID(b"egid"[..].into()), &[Token::String("egid")]);
-    assert_ser_tokens(&Key::Common(Common::Arch), &[Token::String("arch")]);
-    assert_ser_tokens(
-        &Key::NameTranslated(b"foo"[..].into()),
-        &[Token::String("FOO")],
-    );
-    assert_ser_tokens(&Key::Arg(1, None), &[Token::String("a1")]);
-    assert_ser_tokens(&Key::Arg(2, Some(3)), &[Token::String("a2[3]")]);
-    assert_ser_tokens(&Key::ArgLen(2), &[Token::String("a2_len")]);
-    assert_ser_tokens(&Key::Literal("foo"), &[Token::String("foo")]);
+    for (obj, tok) in &[
+        (&Key::Name(b"foo"[..].into()), &[Token::String("foo")]),
+        (&Key::NameUID(b"euid"[..].into()), &[Token::String("euid")]),
+        (&Key::NameGID(b"egid"[..].into()), &[Token::String("egid")]),
+        (&Key::Common(Common::Arch), &[Token::String("arch")]),
+        (&Key::Arg(1, None), &[Token::String("a1")]),
+        (&Key::Arg(2, Some(3)), &[Token::String("a2[3]")]),
+        (&Key::ArgLen(2), &[Token::String("a2_len")]),
+    ] {
+        assert_ser_tokens(obj, *tok);
+        assert_de_tokens(*obj, *tok);
+    }
+
+    for (obj, tok) in &[
+        (
+            &Key::NameTranslated(b"foo"[..].into()),
+            &[Token::String("FOO")],
+        ),
+        (&Key::Literal("foo"), &[Token::String("foo")]),
+    ] {
+        assert_ser_tokens(obj, *tok);
+    }
 }
 
 #[test]
@@ -542,30 +552,91 @@ fn serde_value() {
         &[Token::Bytes(b"{foo}")],
     );
 
-    assert_ser_tokens(&Value::Number(Number::Hex(16)), &[Token::String("0x10")]);
-    assert_ser_tokens(&Value::Number(Number::Oct(16)), &[Token::String("0o20")]);
-    assert_ser_tokens(&Value::Number(Number::Dec(16)), &[Token::I64(16)]);
+    for (obj, tok) in &[
+        (Value::Empty, &[Token::None][..]),
+        (Value::Owned(b"foo".to_vec()), &[Token::Bytes(b"foo")]),
+        (Value::Number(Number::Hex(16)), &[Token::String("0x10")]),
+        (Value::Number(Number::Oct(16)), &[Token::String("0o20")]),
+        (Value::Number(Number::Dec(16)), &[Token::I64(16)]),
+        (
+            Value::List(vec![]),
+            &[Token::Seq { len: Some(0) }, Token::SeqEnd][..],
+        ),
+        (
+            Value::List(vec![
+                Value::Owned(b"foo".to_vec()),
+                Value::Owned(b"bar".to_vec()),
+                Value::Owned(b"baz".to_vec()),
+                Value::from(42),
+            ]),
+            &[
+                Token::Seq { len: Some(4) },
+                Token::Bytes(b"foo"),
+                Token::Bytes(b"bar"),
+                Token::Bytes(b"baz"),
+                Token::I64(42),
+                Token::SeqEnd,
+            ][..],
+        ),
+        (
+            Value::Map(vec![]),
+            &[Token::Map { len: Some(0) }, Token::MapEnd][..],
+        ),
+        (
+            Value::Map(vec![(
+                Key::Name(b"foo"[..].into()),
+                Value::Owned(b"bar".to_vec()),
+            )]),
+            &[
+                Token::Map { len: Some(1) },
+                Token::String("foo"),
+                Token::Bytes(b"bar"),
+                Token::MapEnd,
+            ][..],
+        ),
+    ] {
+        assert_ser_tokens(obj, &tok[..]);
+        assert_de_tokens(obj, &tok[..]);
+    }
+}
 
-    assert_ser_tokens(
-        &Value::List(vec![]),
-        &[Token::Seq { len: Some(0) }, Token::SeqEnd],
-    );
-    assert_ser_tokens(
-        &Value::List(vec![
-            Value::from("foo"),
-            Value::from("bar"),
-            Value::from("baz"),
-            Value::from(42),
-        ]),
-        &[
-            Token::Seq { len: Some(4) },
-            Token::Bytes(b"foo"),
-            Token::Bytes(b"bar"),
-            Token::Bytes(b"baz"),
-            Token::I64(42),
-            Token::SeqEnd,
-        ],
-    );
+#[test]
+#[cfg(feature = "serde")]
+fn serde_number() {
+    for (n, t) in &[
+        (Number::Dec(10), Token::I64(10)),
+        (Number::Hex(0x10), Token::String("0x10")),
+        (Number::Oct(0o10), Token::String("0o10")),
+    ] {
+        assert_ser_tokens(n, &[*t]);
+        assert_de_tokens(n, &[*t]);
+    }
+    assert_de_tokens(&Number::Dec(10), &[Token::U64(10)]);
+}
+
+#[test]
+#[cfg(feature = "serde")]
+fn serde_event_id() {
+    let obj = EventID {
+        timestamp: 1615225617302,
+        sequence: 25836,
+    };
+    let tok = Token::String("1615225617.302:25836");
+
+    assert_ser_tokens(&obj, &[tok]);
+    assert_de_tokens(&obj, &[tok]);
+}
+
+#[test]
+#[cfg(feature = "serde")]
+fn serde_message_type() {
+    for (m, t) in &[
+        (MessageType::SYSCALL, Token::String("SYSCALL")),
+        (MessageType(9999), Token::String("UNKNOWN[9999]")),
+    ] {
+        assert_ser_tokens(m, &[*t]);
+        assert_de_tokens(m, &[*t]);
+    }
 }
 
 #[test]

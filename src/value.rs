@@ -1,11 +1,15 @@
 use std::convert::{Into, TryFrom};
 use std::fmt::{self, Debug, Display};
 use std::iter::Iterator;
-use std::str;
+use std::str::{self, FromStr};
 use std::string::*;
 
 #[cfg(feature = "serde")]
-use serde::{ser::SerializeMap, Serialize, Serializer};
+use serde::{
+    de::{self, MapAccess, SeqAccess, Visitor},
+    ser::SerializeMap,
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 
 use crate::*;
 
@@ -42,6 +46,19 @@ impl Display for Number {
     }
 }
 
+impl FromStr for Number {
+    type Err = std::num::ParseIntError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(s) = s.strip_prefix("0x") {
+            Ok(Number::Hex(u64::from_str_radix(s, 16)?))
+        } else if let Some(s) = s.strip_prefix("0o") {
+            Ok(Number::Oct(u64::from_str_radix(s, 8)?))
+        } else {
+            Ok(Number::Dec(i64::from_str(s)?))
+        }
+    }
+}
+
 #[cfg(feature = "serde")]
 impl Serialize for Number {
     #[inline(always)]
@@ -50,6 +67,37 @@ impl Serialize for Number {
             Number::Dec(n) => s.serialize_i64(*n),
             _ => s.collect_str(&self),
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Number {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_any(NumberVisitor)
+    }
+}
+
+#[cfg(feature = "serde")]
+struct NumberVisitor;
+
+#[cfg(feature = "serde")]
+impl Visitor<'_> for NumberVisitor {
+    type Value = Number;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string or an integer")
+    }
+
+    fn visit_i64<E: de::Error>(self, value: i64) -> Result<Self::Value, E> {
+        Ok(Number::Dec(value))
+    }
+
+    fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
+        Ok(Number::Dec(value as _))
+    }
+
+    fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+        Number::from_str(value).map_err(E::custom)
     }
 }
 
@@ -286,6 +334,66 @@ impl Serialize for Value<'_> {
             Value::Literal(v) => s.collect_str(v),
             Value::Owned(v) => Bytes(v).serialize(s),
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+struct ValueVisitor;
+
+#[cfg(feature = "serde")]
+impl<'de> Visitor<'de> for ValueVisitor {
+    type Value = Value<'de>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string, integer, sequence, map, or null value")
+    }
+
+    fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+        Ok(Value::Empty)
+    }
+
+    fn visit_i64<E: de::Error>(self, value: i64) -> Result<Self::Value, E> {
+        Ok(Value::Number(Number::Dec(value)))
+    }
+
+    fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
+        Ok(Value::Number(Number::Dec(value as _)))
+    }
+
+    fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+        if let Ok(n) = Number::from_str(value) {
+            Ok(Value::Number(n))
+        } else {
+            Ok(Value::from(value.to_string()))
+        }
+    }
+
+    fn visit_bytes<E: de::Error>(self, value: &[u8]) -> Result<Self::Value, E> {
+        Ok(Value::from(value.to_vec()))
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        let mut v = vec![];
+        while let Some(elem) = seq.next_element()? {
+            v.push(elem);
+        }
+        Ok(Value::List(v))
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+        let mut kv = vec![];
+        while let Some((k, v)) = map.next_entry::<Key, Value>()? {
+            kv.push((k, v));
+        }
+        Ok(Value::Map(kv))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Value<'de> {
+    #[inline(always)]
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_any(ValueVisitor)
     }
 }
 

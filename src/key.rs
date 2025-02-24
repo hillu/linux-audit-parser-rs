@@ -1,8 +1,9 @@
 use std::fmt::{self, Debug, Display};
-use std::str;
+use std::str::{self, FromStr};
+use std::convert::Infallible;
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Serializer};
+use serde_with::{DeserializeFromStr, SerializeDisplay};
 
 /// Common [`Key`]s found in SYSCALL records
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
@@ -94,6 +95,7 @@ pub(crate) type NVec = tinyvec::TinyVec<[u8; 14]>;
 ///
 /// [`Body`]: crate::Body
 #[derive(PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "serde", derive(SerializeDisplay, DeserializeFromStr))]
 pub enum Key {
     /// regular ASCII-only name as returned by parser
     Name(NVec),
@@ -149,26 +151,39 @@ impl Display for Key {
     }
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for Key {
-    #[inline(always)]
-    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Key::Arg(x, Some(y)) => s.collect_str(&format_args!("a{x}[{y}]")),
-            Key::Arg(x, None) => s.collect_str(&format_args!("a{x}")),
-            Key::ArgLen(x) => s.collect_str(&format_args!("a{x}_len")),
-            Key::Name(r) | Key::NameUID(r) | Key::NameGID(r) => {
-                // safety: The parser guarantees an ASCII-only key.
-                s.collect_str(unsafe { str::from_utf8_unchecked(r) })
+fn try_parse_a(s: &str) -> Option<Key> {
+    match s.strip_prefix("a") {
+        Some(s) => {
+            if let Some(s) = s.strip_suffix("]") {
+                let (x, y) = s.split_once("[")?;
+                Some(Key::Arg(
+                    u32::from_str(x).ok()?,
+                    Some(u16::from_str(y).ok()?),
+                ))
+            } else if let Some(s) = s.strip_suffix("_len") {
+                Some(Key::ArgLen(u32::from_str(s).ok()?))
+            } else {
+                Some(Key::Arg(u32::from_str(s).ok()?, None))
             }
-            Key::Common(c) => s.collect_str(c),
-            Key::NameTranslated(r) => {
-                // safety: The parser guarantees an ASCII-only key.
-                s.collect_str(&str::to_ascii_uppercase(unsafe {
-                    str::from_utf8_unchecked(r)
-                }))
-            }
-            Key::Literal(l) => s.collect_str(l),
+        }
+        _ => None,
+    }
+}
+
+impl FromStr for Key {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(c) = Common::try_from(s.as_bytes()) {
+            Ok(Key::Common(c))
+        } else if let Some(k) = try_parse_a(s) {
+            Ok(k)
+        } else if s.ends_with("uid") {
+            Ok(Key::NameUID(s.as_bytes().into()))
+        } else if s.ends_with("gid") {
+            Ok(Key::NameGID(s.as_bytes().into()))
+        } else {
+            Ok(Key::from(s.as_bytes()))
         }
     }
 }

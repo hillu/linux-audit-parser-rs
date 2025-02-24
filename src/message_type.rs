@@ -1,7 +1,9 @@
-use std::fmt::{self, Debug, Display};
-
 #[cfg(feature = "serde")]
-use serde::{Serialize, Serializer};
+use serde_with::{DeserializeFromStr, SerializeDisplay};
+use std::fmt::{self, Debug, Display};
+use std::str::{self, FromStr};
+
+use thiserror::Error;
 
 use crate::constants::*;
 
@@ -15,6 +17,7 @@ use crate::constants::*;
 ///
 /// [`Linux Audit Project`]: https://github.com/linux-audit/audit-documentation
 #[derive(PartialEq, Eq, Hash, Default, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(DeserializeFromStr, SerializeDisplay))]
 pub struct MessageType(pub u32);
 
 impl Display for MessageType {
@@ -35,13 +38,31 @@ impl Debug for MessageType {
     }
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for MessageType {
-    #[inline(always)]
-    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        match EVENT_NAMES.get(&(self.0)) {
-            Some(name) => s.collect_str(name),
-            None => s.collect_str(&format_args!("UNKNOWN[{}]", self.0)),
+/// The error type returned by [MessageType::from_str]
+#[derive(Debug, Error)]
+pub enum ParseMessageTypeError {
+    #[error("unknown identifier ({0})")]
+    Unknown(String),
+    #[error("malformed UNKNOWN[…] string")]
+    MalformedUnknown,
+    #[error("cannot parse number ({0}): {1}")]
+    Number(String, std::num::ParseIntError),
+}
+
+impl FromStr for MessageType {
+    type Err = ParseMessageTypeError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(id) = EVENT_IDS.get(s.as_bytes()) {
+            Ok(MessageType(*id))
+        } else {
+            let number = s
+                .strip_prefix("UNKNOWN[")
+                .ok_or_else(|| ParseMessageTypeError::Unknown(s.into()))?
+                .strip_suffix("]")
+                .ok_or(ParseMessageTypeError::MalformedUnknown)?;
+            let id = u32::from_str(number)
+                .map_err(|e| ParseMessageTypeError::Number(number.into(), e))?;
+            Ok(MessageType(id))
         }
     }
 }
