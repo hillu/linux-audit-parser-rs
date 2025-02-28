@@ -543,7 +543,6 @@ fn serde_key() {
 #[test]
 #[cfg(feature = "serde")]
 fn serde_value() {
-    assert_ser_tokens(&Value::Empty, &[Token::None]);
     for q in &[Quote::None, Quote::Single, Quote::Double] {
         assert_ser_tokens(&Value::Str(&b"foo"[..], *q), &[Token::Bytes(b"foo")]);
     }
@@ -553,7 +552,7 @@ fn serde_value() {
     );
 
     for (obj, tok) in &[
-        (Value::Empty, &[Token::None][..]),
+        (Value::Empty, &[Token::Unit][..]),
         (Value::Owned(b"foo".to_vec()), &[Token::Bytes(b"foo")]),
         (Value::Number(Number::Hex(16)), &[Token::String("0x10")]),
         (Value::Number(Number::Oct(16)), &[Token::String("0o20")]),

@@ -288,7 +288,7 @@ impl Serialize for Value<'_> {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         match self {
-            Value::Empty => s.serialize_none(),
+            Value::Empty => s.serialize_unit(),
             Value::Str(r, Quote::Braces) => {
                 let mut buf = Vec::with_capacity(r.len() + 2);
                 buf.push(b'{');
@@ -349,6 +349,10 @@ impl<'de> Visitor<'de> for ValueVisitor {
     }
 
     fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+        Ok(Value::Empty)
+    }
+
+    fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
         Ok(Value::Empty)
     }
 
