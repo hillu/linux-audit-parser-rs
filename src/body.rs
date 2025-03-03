@@ -55,9 +55,11 @@ impl Serialize for Body<'_> {
     }
 }
 
+#[cfg(feature = "serde")]
 #[derive(Default)]
 struct BodyVisitor<'a>(std::marker::PhantomData<Body<'a>>);
 
+#[cfg(feature = "serde")]
 impl<'a, 'de> Visitor<'de> for BodyVisitor<'a> {
     type Value = Body<'a>;
 
@@ -74,6 +76,7 @@ impl<'a, 'de> Visitor<'de> for BodyVisitor<'a> {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Body<'_> {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         d.deserialize_map(BodyVisitor::default())
