@@ -185,7 +185,7 @@ impl Body<'_> {
     }
 
     /// Retrieves the first value found for a given `key`.
-    pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<&Value> {
+    pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<&Value<'_>> {
         let key = key.as_ref();
         self.elems.iter().find(|(k, _)| k == key).map(|(_, v)| v)
     }

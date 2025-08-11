@@ -342,7 +342,7 @@ fn parse_named<'a>(input: &'a [u8], ty: MessageType, name: &[u8]) -> IResult<&'a
 ///
 /// May be double-quoted string, hex-encoded blob, (null), ?.
 #[inline(always)]
-fn parse_encoded(input: &[u8]) -> IResult<&[u8], Value> {
+fn parse_encoded(input: &[u8]) -> IResult<&[u8], Value<'_>> {
     alt((
         map(parse_str_dq_safe, |s| Value::Str(s, Quote::Double)),
         terminated(
@@ -368,7 +368,7 @@ fn parse_encoded(input: &[u8]) -> IResult<&[u8], Value> {
 
 /// Recognize hexadecimal value
 #[inline(always)]
-fn parse_hex(input: &[u8]) -> IResult<&[u8], Value> {
+fn parse_hex(input: &[u8]) -> IResult<&[u8], Value<'_>> {
     map_res(
         terminated(take_while1(is_hex_digit), peek(take_while1(is_sep))),
         |digits| -> Result<_, std::num::ParseIntError> {
@@ -380,7 +380,7 @@ fn parse_hex(input: &[u8]) -> IResult<&[u8], Value> {
 
 /// Recognize decimal value
 #[inline(always)]
-fn parse_dec(input: &[u8]) -> IResult<&[u8], Value> {
+fn parse_dec(input: &[u8]) -> IResult<&[u8], Value<'_>> {
     map(terminated(dec_i64, peek(take_while1(is_sep))), |n| {
         Value::Number(Number::Dec(n))
     })(input)
@@ -388,7 +388,7 @@ fn parse_dec(input: &[u8]) -> IResult<&[u8], Value> {
 
 /// Recognize octal value
 #[inline(always)]
-fn parse_oct(input: &[u8]) -> IResult<&[u8], Value> {
+fn parse_oct(input: &[u8]) -> IResult<&[u8], Value<'_>> {
     map_res(
         terminated(take_while1(is_oct_digit), peek(take_while1(is_sep))),
         |digits| -> Result<_, std::num::ParseIntError> {
@@ -510,7 +510,7 @@ fn parse_kv_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
 
 /// Recognize a map enclosed in single quotes
 #[inline(always)]
-fn parse_kv_sq_as_map(input: &[u8]) -> IResult<&[u8], Value> {
+fn parse_kv_sq_as_map(input: &[u8]) -> IResult<&[u8], Value<'_>> {
     map(
         delimited(
             tag("'"),
