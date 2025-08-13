@@ -40,8 +40,8 @@ pub enum ParseEventIDError {
 impl FromStr for EventID {
     type Err = ParseEventIDError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (sec, rest) = s.split_once(".").ok_or(ParseEventIDError::Format('.'))?;
-        let (msec, seq) = rest.split_once(":").ok_or(ParseEventIDError::Format(':'))?;
+        let (sec, rest) = s.split_once('.').ok_or(ParseEventIDError::Format('.'))?;
+        let (msec, seq) = rest.split_once(':').ok_or(ParseEventIDError::Format(':'))?;
         Ok(EventID {
             timestamp: u64::from_str(sec).map_err(ParseEventIDError::Number)? * 1000
                 + u64::from_str(msec).map_err(ParseEventIDError::Number)?,

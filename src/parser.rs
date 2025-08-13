@@ -280,11 +280,11 @@ impl Parser {
 #[inline(always)]
 #[allow(clippy::type_complexity)]
 fn parse_header(input: &[u8]) -> IResult<&[u8], (Option<&[u8]>, MessageType, EventID)> {
-    ((
+    (
         opt(terminated(parse_node, is_a(" "))),
         terminated(parse_type, is_a(" ")),
         parse_msgid,
-    ))
+    )
         .parse(input)
 }
 
