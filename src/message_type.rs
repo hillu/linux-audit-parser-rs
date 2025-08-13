@@ -58,7 +58,7 @@ impl FromStr for MessageType {
             let number = s
                 .strip_prefix("UNKNOWN[")
                 .ok_or_else(|| ParseMessageTypeError::Unknown(s.into()))?
-                .strip_suffix("]")
+                .strip_suffix(']')
                 .ok_or(ParseMessageTypeError::MalformedUnknown)?;
             let id = u32::from_str(number)
                 .map_err(|e| ParseMessageTypeError::Number(number.into(), e))?;

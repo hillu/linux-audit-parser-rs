@@ -152,10 +152,10 @@ impl Display for Key {
 }
 
 fn try_parse_a(s: &str) -> Option<Key> {
-    match s.strip_prefix("a") {
+    match s.strip_prefix('a') {
         Some(s) => {
-            if let Some(s) = s.strip_suffix("]") {
-                let (x, y) = s.split_once("[")?;
+            if let Some(s) = s.strip_suffix(']') {
+                let (x, y) = s.split_once('[')?;
                 Some(Key::Arg(
                     u32::from_str(x).ok()?,
                     Some(u16::from_str(y).ok()?),
