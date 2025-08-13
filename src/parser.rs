@@ -2,8 +2,8 @@ use std::convert::{From, TryFrom};
 use std::str;
 
 use nom::{
-    branch::*, bytes::complete::*, character::complete::*, character::*, combinator::*, multi::*,
-    sequence::*, IResult,
+    branch::*, bytes::complete::*, character::complete::*, combinator::*, multi::*, sequence::*,
+    AsChar, IResult, Parser as P,
 };
 
 use nom::character::complete::{i64 as dec_i64, u16 as dec_u16, u32 as dec_u32, u64 as dec_u64};
@@ -105,17 +105,17 @@ impl Parser {
         // scheme.
         let (input, special) = match ty {
             MessageType::AVC => opt(map(
-                tuple((
+                (
                     preceded(
                         pair(tag("avc:"), space0),
                         alt((tag("granted"), tag("denied"))),
                     ),
                     delimited(
-                        tuple((space0, tag("{"), space0)),
+                        (space0, tag("{"), space0),
                         many1(terminated(parse_identifier, space0)),
-                        tuple((tag("}"), space0, tag("for"), space0)),
+                        (tag("}"), space0, tag("for"), space0),
                     ),
-                )),
+                ),
                 |(k, v)| {
                     (
                         Key::Name(NVec::from(k)),
@@ -126,36 +126,40 @@ impl Parser {
                         ),
                     )
                 },
-            ))(input)?,
+            ))
+            .parse(input)?,
             MessageType::TTY => {
-                let (input, _) = opt(tag("tty "))(input)?;
+                let (input, _) = opt(tag("tty ")).parse(input)?;
                 (input, None)
             }
             MessageType::MAC_POLICY_LOAD => {
-                let (input, _) = opt(tag("policy loaded "))(input)?;
+                let (input, _) = opt(tag("policy loaded ")).parse(input)?;
                 (input, None)
             }
             _ => opt(map(
                 terminated(tag("netlabel"), pair(tag(":"), space0)),
                 |s| (Key::Name(NVec::from(s)), Value::Empty),
-            ))(input)?,
+            ))
+            .parse(input)?,
         };
 
         let (input, mut kv) = if !self.enriched {
             terminated(
                 separated_list0(take_while1(|c| c == b' '), |input| self.parse_kv(input, ty)),
                 alt((
-                    value((), tuple((tag("\x1d"), is_not("\n"), tag("\n")))),
+                    value((), (tag("\x1d"), is_not("\n"), tag("\n"))),
                     value((), tag("\n")),
                 )),
-            )(input)?
+            )
+            .parse(input)?
         } else {
             terminated(
                 separated_list0(take_while1(|c| c == b' ' || c == b'\x1d'), |input| {
                     self.parse_kv(input, ty)
                 }),
                 newline,
-            )(input)?
+            )
+            .parse(input)?
         };
 
         if let Some(s) = special {
@@ -180,17 +184,20 @@ impl Parser {
                 terminated(
                     alt((parse_key_a_x_len, parse_key_a_xy, parse_key_a_x)),
                     tag("="),
-                )(input)
+                )
+                .parse(input)
             }
             // Special case for syscall params: aX
-            MessageType::SYSCALL => terminated(alt((parse_key_a_x, parse_key)), tag("="))(input),
-            _ => terminated(parse_key, tag("="))(input),
+            MessageType::SYSCALL => {
+                terminated(alt((parse_key_a_x, parse_key)), tag("=")).parse(input)
+            }
+            _ => terminated(parse_key, tag("=")).parse(input),
         }?;
 
         let (input, value) = match (ty, &key) {
             (MessageType::SYSCALL, Key::Arg(_, None)) => map(
                 recognize(terminated(
-                    many1_count(take_while1(is_hex_digit)),
+                    many1_count(take_while1(AsChar::is_hex_digit)),
                     peek(take_while1(is_sep)),
                 )),
                 |s| {
@@ -200,14 +207,15 @@ impl Parser {
                         Err(_) => Value::Str(s, Quote::None),
                     }
                 },
-            )(input)?,
+            )
+            .parse(input)?,
             (MessageType::SYSCALL, Key::Common(c)) => self.parse_common(input, ty, *c)?,
             (MessageType::EXECVE, Key::Arg(_, _)) => parse_encoded(input)?,
             (MessageType::EXECVE, Key::ArgLen(_)) => parse_dec(input)?,
             (_, Key::Name(name)) => parse_named(input, ty, name)?,
             (_, Key::Common(c)) => self.parse_common(input, ty, *c)?,
             (_, Key::NameUID(name)) | (_, Key::NameGID(name)) => {
-                alt((parse_dec, |input| parse_unspec_value(input, ty, name)))(input)?
+                alt((parse_dec, |input| parse_unspec_value(input, ty, name))).parse(input)?
             }
             _ => parse_encoded(input)?,
         };
@@ -225,7 +233,7 @@ impl Parser {
         let name = <&str>::from(c).as_bytes();
         match c {
             Common::Arch | Common::CapFi | Common::CapFp | Common::CapFver => {
-                alt((parse_hex, |input| parse_unspec_value(input, ty, name)))(input)
+                alt((parse_hex, |input| parse_unspec_value(input, ty, name))).parse(input)
             }
             Common::Argc
             | Common::Exit
@@ -237,7 +245,7 @@ impl Parser {
             | Common::PPid
             | Common::Ses
             | Common::Syscall => {
-                alt((parse_dec, |input| parse_unspec_value(input, ty, name)))(input)
+                alt((parse_dec, |input| parse_unspec_value(input, ty, name))).parse(input)
             }
             Common::Success
             | Common::Cwd
@@ -249,16 +257,19 @@ impl Parser {
             | Common::Nametype
             | Common::Subj
             | Common::Key => {
-                alt((parse_encoded, |input| parse_unspec_value(input, ty, name)))(input)
+                alt((parse_encoded, |input| parse_unspec_value(input, ty, name))).parse(input)
             }
-            Common::Mode => alt((parse_oct, |input| parse_unspec_value(input, ty, name)))(input),
+            Common::Mode => {
+                alt((parse_oct, |input| parse_unspec_value(input, ty, name))).parse(input)
+            }
             Common::Msg => {
                 if self.split_msg {
                     alt((parse_kv_sq_as_map, |input| {
                         parse_unspec_value(input, ty, name)
-                    }))(input)
+                    }))
+                    .parse(input)
                 } else {
-                    alt((parse_encoded, |input| parse_unspec_value(input, ty, name)))(input)
+                    alt((parse_encoded, |input| parse_unspec_value(input, ty, name))).parse(input)
                 }
             }
         }
@@ -269,17 +280,18 @@ impl Parser {
 #[inline(always)]
 #[allow(clippy::type_complexity)]
 fn parse_header(input: &[u8]) -> IResult<&[u8], (Option<&[u8]>, MessageType, EventID)> {
-    tuple((
+    ((
         opt(terminated(parse_node, is_a(" "))),
         terminated(parse_type, is_a(" ")),
         parse_msgid,
-    ))(input)
+    ))
+        .parse(input)
 }
 
 /// Recognize the node name
 #[inline(always)]
 fn parse_node(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    preceded(tag("node="), is_not(" \t\r\n"))(input)
+    preceded(tag("node="), is_not(" \t\r\n")).parse(input)
 }
 
 /// Recognize event type
@@ -299,42 +311,44 @@ fn parse_type(input: &[u8]) -> IResult<&[u8], MessageType> {
             ),
             map(delimited(tag("UNKNOWN["), dec_u32, tag("]")), MessageType),
         )),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Recognize the "msg=audit(…):" event identifier
 #[inline(always)]
 fn parse_msgid(input: &[u8]) -> IResult<&[u8], EventID> {
     map(
-        tuple((
+        (
             preceded(tag("msg=audit("), dec_u64),
             delimited(tag("."), dec_u64, tag(":")),
             terminated(dec_u32, pair(tag("):"), space0)),
-        )),
+        ),
         |(sec, msec, sequence)| EventID {
             timestamp: 1000 * sec + msec,
             sequence,
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 #[inline(always)]
 fn parse_named<'a>(input: &'a [u8], ty: MessageType, name: &[u8]) -> IResult<&'a [u8], Value<'a>> {
     match FIELD_TYPES.get(name) {
         Some(&FieldType::Encoded) => {
-            alt((parse_encoded, |input| parse_unspec_value(input, ty, name)))(input)
+            alt((parse_encoded, |input| parse_unspec_value(input, ty, name))).parse(input)
         }
         Some(&FieldType::NumericHex) => {
-            alt((parse_hex, |input| parse_unspec_value(input, ty, name)))(input)
+            alt((parse_hex, |input| parse_unspec_value(input, ty, name))).parse(input)
         }
         Some(&FieldType::NumericDec) => {
-            alt((parse_dec, |input| parse_unspec_value(input, ty, name)))(input)
+            alt((parse_dec, |input| parse_unspec_value(input, ty, name))).parse(input)
         }
         Some(&FieldType::NumericOct) => {
-            alt((parse_oct, |input| parse_unspec_value(input, ty, name)))(input)
+            alt((parse_oct, |input| parse_unspec_value(input, ty, name))).parse(input)
         }
         // FIXME: Some(&FieldType::Numeric)
-        _ => alt((parse_encoded, |input| parse_unspec_value(input, ty, name)))(input),
+        _ => alt((parse_encoded, |input| parse_unspec_value(input, ty, name))).parse(input),
     }
 }
 
@@ -347,7 +361,7 @@ fn parse_encoded(input: &[u8]) -> IResult<&[u8], Value<'_>> {
         map(parse_str_dq_safe, |s| Value::Str(s, Quote::Double)),
         terminated(
             map(
-                recognize(many1_count(take_while_m_n(2, 2, is_hex_digit))),
+                recognize(many1_count(take_while_m_n(2, 2, AsChar::is_hex_digit))),
                 |hexstr: &[u8]| {
                     let mut recoded = Vec::with_capacity(hexstr.len() / 2);
                     for i in 0..hexstr.len() / 2 {
@@ -363,19 +377,21 @@ fn parse_encoded(input: &[u8]) -> IResult<&[u8], Value<'_>> {
             value(Value::Empty, alt((tag("(null)"), tag("?")))),
             peek(take_while1(is_sep)),
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Recognize hexadecimal value
 #[inline(always)]
 fn parse_hex(input: &[u8]) -> IResult<&[u8], Value<'_>> {
     map_res(
-        terminated(take_while1(is_hex_digit), peek(take_while1(is_sep))),
+        terminated(take_while1(AsChar::is_hex_digit), peek(take_while1(is_sep))),
         |digits| -> Result<_, std::num::ParseIntError> {
             let digits = unsafe { str::from_utf8_unchecked(digits) };
             Ok(Value::Number(Number::Hex(u64::from_str_radix(digits, 16)?)))
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Recognize decimal value
@@ -383,19 +399,21 @@ fn parse_hex(input: &[u8]) -> IResult<&[u8], Value<'_>> {
 fn parse_dec(input: &[u8]) -> IResult<&[u8], Value<'_>> {
     map(terminated(dec_i64, peek(take_while1(is_sep))), |n| {
         Value::Number(Number::Dec(n))
-    })(input)
+    })
+    .parse(input)
 }
 
 /// Recognize octal value
 #[inline(always)]
 fn parse_oct(input: &[u8]) -> IResult<&[u8], Value<'_>> {
     map_res(
-        terminated(take_while1(is_oct_digit), peek(take_while1(is_sep))),
+        terminated(take_while1(AsChar::is_oct_digit), peek(take_while1(is_sep))),
         |digits| -> Result<_, std::num::ParseIntError> {
             let digits = unsafe { str::from_utf8_unchecked(digits) };
             Ok(Value::Number(Number::Oct(u64::from_str_radix(digits, 8)?)))
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 #[inline(always)]
@@ -407,11 +425,12 @@ fn parse_unspec_value<'a>(
     // work around apparent AppArmor breakage
     match (ty, name) {
         (_, b"subj") => {
-            if let Ok((input, s)) = recognize(tuple((
+            if let Ok((input, s)) = recognize((
                 opt(tag("=")),
                 parse_str_unq,
                 opt(delimited(tag(" ("), parse_identifier, tag(")"))),
-            )))(input)
+            ))
+            .parse(input)
             {
                 return Ok((input, Value::Str(s, Quote::None)));
             }
@@ -423,7 +442,7 @@ fn parse_unspec_value<'a>(
         }
         (MessageType::SOCKADDR, b"SADDR") => {
             let broken_string: IResult<&[u8], &[u8]> =
-                recognize(pair(tag("unknown family"), opt(take_till(is_sep))))(input);
+                recognize(pair(tag("unknown family"), opt(take_till(is_sep)))).parse(input);
             if let Ok((input, s)) = broken_string {
                 return Ok((input, Value::Str(s, Quote::None)));
             }
@@ -444,37 +463,38 @@ fn parse_unspec_value<'a>(
         map(parse_kv_braced, |s| Value::Str(s, Quote::Braces)),
         map(parse_str_braced, |s| Value::Str(s, Quote::Braces)),
         value(Value::Empty, peek(take_while1(is_sep))),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 #[inline(always)]
 fn parse_str_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    delimited(tag("'"), take_while(|c| c != b'\''), tag("'"))(input)
+    delimited(tag("'"), take_while(|c| c != b'\''), tag("'")).parse(input)
 }
 
 #[inline(always)]
 fn parse_str_dq_safe(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    delimited(tag("\""), take_while(is_safe_chr), tag("\""))(input)
+    delimited(tag("\""), take_while(is_safe_chr), tag("\"")).parse(input)
 }
 
 #[inline(always)]
 fn parse_str_dq(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    delimited(tag("\""), take_while(|c| c != b'"'), tag("\""))(input)
+    delimited(tag("\""), take_while(|c| c != b'"'), tag("\"")).parse(input)
 }
 
 #[inline(always)]
 fn parse_str_braced(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    delimited(tag("{ "), take_until(" }"), tag(" }"))(input)
+    delimited(tag("{ "), take_until(" }"), tag(" }")).parse(input)
 }
 
 #[inline(always)]
 fn parse_str_unq(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    take_while(is_safe_chr)(input)
+    take_while(is_safe_chr).parse(input)
 }
 
 #[inline(always)]
 fn parse_str_unq_inside_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    take_while(|c| is_safe_chr(c) && c != b'\'')(input)
+    take_while(|c| is_safe_chr(c) && c != b'\'').parse(input)
 }
 
 #[inline(always)]
@@ -482,7 +502,10 @@ fn parse_str_words_inside_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let mut rest = input;
     loop {
         (rest, _) = take_while(|c| !b"' ".contains(&c))(rest)?;
-        if alt((recognize(tuple((space1, parse_key, tag("=")))), tag("'")))(rest).is_ok() {
+        if alt((recognize((space1, parse_key, tag("="))), tag("'")))
+            .parse(rest)
+            .is_ok()
+        {
             break;
         }
         (rest, _) = space1(rest)?;
@@ -498,14 +521,15 @@ fn parse_kv_sq(input: &[u8]) -> IResult<&[u8], &[u8]> {
         tag("'"),
         recognize(separated_list0(
             tag(" "),
-            tuple((
+            (
                 recognize(pair(alpha1, many0_count(alt((alphanumeric1, is_a("-_")))))),
                 tag("="),
                 alt((parse_str_dq, parse_str_braced, parse_str_unq_inside_sq)),
-            )),
+            ),
         )),
         tag("'"),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Recognize a map enclosed in single quotes
@@ -520,7 +544,7 @@ fn parse_kv_sq_as_map(input: &[u8]) -> IResult<&[u8], Value<'_>> {
                     parse_key,
                     alt((
                         tag("="),
-                        recognize(tuple((tag(":"), space0))), // for 'avc:  mumble mumble mumble …'
+                        recognize((tag(":"), space0)), // for 'avc:  mumble mumble mumble …'
                     )),
                     alt((
                         parse_encoded,
@@ -532,7 +556,8 @@ fn parse_kv_sq_as_map(input: &[u8]) -> IResult<&[u8], Value<'_>> {
             tag("'"),
         ),
         Value::Map,
-    )(input)
+    )
+    .parse(input)
 }
 
 /// More "correct" variant of parse_str_braced
@@ -542,14 +567,15 @@ fn parse_kv_braced(input: &[u8]) -> IResult<&[u8], &[u8]> {
         tag("{ "),
         recognize(separated_list0(
             tag(" "),
-            tuple((
+            (
                 recognize(pair(alpha1, many0_count(alt((alphanumeric1, is_a("-_")))))),
                 tag("="),
                 alt((parse_str_sq, parse_str_dq, parse_str_unq)),
-            )),
+            ),
         )),
         tag(" }"),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Recognize regular keys of key/value pairs
@@ -568,13 +594,14 @@ fn parse_key(input: &[u8]) -> IResult<&[u8], Key> {
                 Key::Name(NVec::from(s))
             }
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Recognize length specifier for EXECVE split arguments, e.g. a1_len
 #[inline(always)]
 fn parse_key_a_x_len(input: &[u8]) -> IResult<&[u8], Key> {
-    map(delimited(tag("a"), dec_u32, tag("_len")), Key::ArgLen)(input)
+    map(delimited(tag("a"), dec_u32, tag("_len")), Key::ArgLen).parse(input)
 }
 
 /// Recognize EXECVE split arguments, e.g. a1[3]
@@ -586,13 +613,14 @@ fn parse_key_a_xy(input: &[u8]) -> IResult<&[u8], Key> {
             delimited(tag("["), dec_u16, tag("]")),
         ),
         |(x, y)| Key::Arg(x, Some(y)),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Recognize SYSCALL, EXECVE regular argument keys, e.g. a1, a2, a3…
 #[inline(always)]
 fn parse_key_a_x(input: &[u8]) -> IResult<&[u8], Key> {
-    map(preceded(tag("a"), u32), |x| Key::Arg(x, None))(input)
+    map(preceded(tag("a"), u32), |x| Key::Arg(x, None)).parse(input)
 }
 
 /// Recognize identifiers (used in some irregular messages)
@@ -602,7 +630,8 @@ fn parse_identifier(input: &[u8]) -> IResult<&[u8], &[u8]> {
     recognize(pair(
         alt((alpha1, tag("_"))),
         many0_count(alt((alphanumeric1, tag("_")))),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Characters permitted in kernel "encoded" strings that would
