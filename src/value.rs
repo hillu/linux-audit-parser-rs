@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::convert::{Into, TryFrom};
 use std::fmt::{self, Debug, Display};
 use std::iter::Iterator;
@@ -427,6 +428,16 @@ impl PartialEq<[u8]> for Value<'_> {
             | Value::Map(_)
             | Value::Skipped(_)
             | Value::Number(_) => false,
+        }
+    }
+}
+
+impl<'a> From<Option<Cow<'a, [u8]>>> for Value<'a> {
+    fn from(value: Option<Cow<'a, [u8]>>) -> Self {
+        match value {
+            Some(Cow::Borrowed(v)) => Value::Str(v, Quote::Double),
+            Some(Cow::Owned(v)) => Value::Owned(v),
+            None => Value::Empty,
         }
     }
 }
