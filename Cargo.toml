@@ -1,7 +1,7 @@
 [package]
 name = "linux-audit-parser"
 description = "Parser for Linxu Audit logs"
-repository = "https://github.com/hillu/linux-audit-parser-rs"
+repository = "https://codeberg.org/hillu/linux-audit-parser-rs"
 version = "0.2.7"
 edition = "2021"
 license = "LGPL-3.0-or-later"
