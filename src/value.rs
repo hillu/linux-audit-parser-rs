@@ -104,8 +104,10 @@ impl Visitor<'_> for NumberVisitor {
 
 /// Representation of the value part of key/value pairs in [`Body`]
 #[derive(Clone, PartialEq)]
+#[derive(Default)]
 pub enum Value<'a> {
     /// Empty value.
+    #[default]
     Empty,
     /// A byte string.
     Str(&'a [u8], Quote),
@@ -127,11 +129,6 @@ pub enum Value<'a> {
     Literal(&'static str),
 }
 
-impl Default for Value<'_> {
-    fn default() -> Self {
-        Self::Empty
-    }
-}
 
 impl Value<'_> {
     pub fn str_len(&self) -> usize {
