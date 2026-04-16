@@ -103,8 +103,7 @@ impl Visitor<'_> for NumberVisitor {
 }
 
 /// Representation of the value part of key/value pairs in [`Body`]
-#[derive(Clone, PartialEq)]
-#[derive(Default)]
+#[derive(Clone, PartialEq, Default)]
 pub enum Value<'a> {
     /// Empty value.
     #[default]
@@ -128,7 +127,6 @@ pub enum Value<'a> {
     /// A literal string. Not produced by the parser.
     Literal(&'static str),
 }
-
 
 impl Value<'_> {
     pub fn str_len(&self) -> usize {
